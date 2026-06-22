@@ -1,16 +1,18 @@
 # Delta skip-completed marker for ouroboros run workflow
 #
-# Updated for the 3rd run: AC 1-9 are now satisfied + committed, so the 3rd run
-# only executes the one remaining criterion:
-#   AC 10 — Stage2EngineImplemented (real Presidio + spaCy Korean NER, replacing the stub)
+# Updated for the 4th run: ALL 10 ACs are now satisfied + committed and verified
+# locally, so a 4th run finds the full set externally satisfied (clean 10/10,
+# no re-decomposition / no timeout / no DAG-block cascade).
 #
 # History:
-#   AC 1-7  — delivered by 1st workflow run (orch_9b02af28c3eb), committed in 89dc5c5
-#   AC 8-9  — delivered by 2nd delta run   (orch_0beb4d187a02), committed in 56250c6 + e89f78d
+#   AC 1-7  — 1st workflow run (orch_9b02af28c3eb), committed in 89dc5c5
+#   AC 8-9  — 2nd delta run    (orch_0beb4d187a02), committed in 56250c6 + e89f78d
+#   AC 10   — 3rd delta run    (orch_ff28f790eece), committed in f8a1c91 + 45fdb3a;
+#             ko_core_news_lg upgrade in ad26e20 (PERSON recall 0.67 -> 0.84)
 #
-# Verified locally before this marker: 2508 passed, 12 skipped, 0 failed
-# (skips require root+pf(4)+network). AC numbers are 1-based and match
-# acceptance_criteria order in seed_5cfc8e8ae623.yaml.
+# Verified locally before this marker: 2626 passed, 12 skipped, 0 failed
+# (with .venv: presidio + spaCy ko_core_news_lg; skips require root+pf(4)+network).
+# AC numbers are 1-based and match acceptance_criteria order in seed_5cfc8e8ae623.yaml.
 completed_acs:
   - ac: 1
     reason: "Cross-provider block/mask of secrets + contact PII, zero-config (verified by test_claude_wire/openai_wire/gemini_wire, test_categories, test_masker)"
@@ -39,3 +41,6 @@ completed_acs:
   - ac: 9
     reason: "StreamingRehydrationSafe: bounded look-ahead buffering reassembles placeholders across SSE chunk boundaries, TTFT preserved (streaming_buffer, streaming_rehydrator; test_streaming_buffer, test_streaming_rehydration_integration — TTFT tests pass)"
     commit: "e89f78d"
+  - ac: 10
+    reason: "Stage2EngineImplemented: real Presidio + spaCy Korean NER (korean_ner.py, policy_layer.py) replacing the stub; ko_core_news_lg preferred (PERSON R=0.84, ADDRESS R=1.00, ORG R=0.92, thresholds_met=true); runs in isolated subprocess preserving Stage1 degradation; precision/recall measured by benchmarks/korean_ner_benchmark.py + tests/test_ner_benchmark.py (56 passed) + test_stage2_korean_ner.py (118 passed)"
+    commit: "ad26e20"
