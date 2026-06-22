@@ -2,10 +2,11 @@
 #
 # Marks the 7 acceptance criteria delivered by the first workflow run
 # (orchestrator session orch_9b02af28c3eb) as already satisfied by the
-# working tree, so a second run only executes the two criteria added to the
+# working tree, so a second run only executes the criteria added to the
 # seed AFTER that run started:
-#   AC 8 — ProtocolSurfaceCovered (structured parsers + full-body tripwire sweep)
-#   AC 9 — StreamingRehydrationSafe (SSE chunk-boundary look-ahead buffering)
+#   AC 8  — ProtocolSurfaceCovered (structured parsers + full-body tripwire sweep)
+#   AC 9  — StreamingRehydrationSafe (SSE chunk-boundary look-ahead buffering)
+#   AC 10 — Stage2EngineImplemented (real Presidio + spaCy Korean NER, replacing the stub)
 #
 # Verified locally: 1827 passed, 12 skipped (root+pf(4)+network integration skips).
 # AC numbers are 1-based and match acceptance_criteria order in
