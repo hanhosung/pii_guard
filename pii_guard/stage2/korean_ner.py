@@ -2,13 +2,18 @@
 pii_guard/stage2/korean_ner.py
 
 Korean NER engine using Microsoft Presidio orchestrating a spaCy Korean model
-(ko_core_news_sm) to detect unstructured Korean PII — person names, addresses
-(locations), and organizations — that Stage-1 regex cannot catch.
+to detect unstructured Korean PII — person names, addresses (locations), and
+organizations — that Stage-1 regex cannot catch.
+
+Model selection (see :func:`resolve_ko_spacy_model`): ``ko_core_news_lg`` is
+preferred when installed (materially better PERSON/ADDRESS/ORGANIZATION recall),
+with ``ko_core_news_sm`` as a lightweight fallback. Override with the
+``PIIGUARD_KO_SPACY_MODEL`` environment variable.
 
 Architecture
 ------------
 ``KoreanNEREngine`` wraps Presidio's ``AnalyzerEngine`` configured with the
-``ko_core_news_sm`` spaCy model.  The spaCy Korean model uses its own entity
+resolved Korean spaCy model.  The spaCy Korean model uses its own entity
 label scheme (PS=Person, LC=Location, OG=Organization); we register a
 ``NerModelConfiguration`` that maps these to Presidio's canonical entity types
 (PERSON, LOCATION, ORGANIZATION).  A custom ``SpacyRecognizer`` restricted to
@@ -53,6 +58,7 @@ Notes on model limitations
 from __future__ import annotations
 
 import logging
+import os
 from typing import List, Optional
 
 from ..models import (
@@ -67,6 +73,41 @@ logger = logging.getLogger(__name__)
 
 # Minimum confidence threshold — detections below this are discarded.
 MIN_CONFIDENCE: float = 0.50
+
+# Korean spaCy models in order of preference. The larger ``lg`` model has
+# materially better PERSON recall than ``sm`` (at the cost of ~10x size / load
+# time), so it is preferred when installed; ``sm`` remains the lightweight
+# fallback. Override explicitly with the PIIGUARD_KO_SPACY_MODEL env var.
+_PREFERRED_KO_MODELS = ("ko_core_news_lg", "ko_core_news_sm")
+_KO_MODEL_ENV_VAR = "PIIGUARD_KO_SPACY_MODEL"
+
+
+def resolve_ko_spacy_model() -> str:
+    """
+    Resolve which Korean spaCy model to load.
+
+    Resolution order:
+
+    1. ``PIIGUARD_KO_SPACY_MODEL`` env var, if set (used verbatim — no fallback,
+       so a typo surfaces as a clear load error rather than silent degradation).
+    2. The first installed model in :data:`_PREFERRED_KO_MODELS` (``lg`` then ``sm``).
+    3. ``ko_core_news_sm`` as a last resort (its absence raises a clear error at
+       load time with the ``spacy download`` hint).
+    """
+    override = os.environ.get(_KO_MODEL_ENV_VAR)
+    if override:
+        return override.strip()
+
+    try:
+        import spacy.util
+
+        for name in _PREFERRED_KO_MODELS:
+            if spacy.util.is_package(name):
+                return name
+    except Exception:  # noqa: BLE001 — spaCy missing; fall through to default
+        pass
+
+    return "ko_core_news_sm"
 
 # Mapping from Presidio entity type to PII-Guard category name.
 _PRESIDIO_TO_CATEGORY: dict = {
@@ -137,9 +178,13 @@ class KoreanNEREngine:
         self,
         min_confidence: float = MIN_CONFIDENCE,
         strip_particles: bool = True,
+        model_name: Optional[str] = None,
     ) -> None:
         self._min_confidence = min_confidence
         self._strip_particles = strip_particles
+        # None → resolve at load time (lg-preferred, env-overridable). An explicit
+        # name pins the model (used by tests / benchmarks).
+        self._model_name = model_name
         self._analyzer: Optional[object] = None  # lazy — set on first use
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -222,11 +267,13 @@ class KoreanNEREngine:
         if self._analyzer is not None:
             return self._analyzer
 
-        self._analyzer = _build_presidio_analyzer()
+        model_name = self._model_name or resolve_ko_spacy_model()
+        logger.info("Loading Korean spaCy model for NER: %s", model_name)
+        self._analyzer = _build_presidio_analyzer(model_name)
         return self._analyzer
 
 
-def _build_presidio_analyzer():
+def _build_presidio_analyzer(model_name: Optional[str] = None):
     """
     Construct and return a Presidio ``AnalyzerEngine`` for Korean text.
 
@@ -243,6 +290,9 @@ def _build_presidio_analyzer():
     RuntimeError
         When ``ko_core_news_sm`` is not installed or Presidio imports fail.
     """
+    if model_name is None:
+        model_name = resolve_ko_spacy_model()
+
     try:
         from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
         from presidio_analyzer.nlp_engine import NlpEngineProvider
@@ -258,7 +308,7 @@ def _build_presidio_analyzer():
             nlp_configuration={
                 "nlp_engine_name": "spacy",
                 "models": [
-                    {"lang_code": "ko", "model_name": "ko_core_news_sm"}
+                    {"lang_code": "ko", "model_name": model_name}
                 ],
                 "ner_model_configuration": {
                     # Map Korean spaCy NER labels → Presidio canonical entity names
@@ -276,8 +326,8 @@ def _build_presidio_analyzer():
         nlp_engine = provider.create_engine()
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(
-            "Failed to load Korean spaCy model 'ko_core_news_sm'. "
-            "Run: python -m spacy download ko_core_news_sm"
+            f"Failed to load Korean spaCy model '{model_name}'. "
+            f"Run: python -m spacy download {model_name}"
         ) from exc
 
     # Korean recognizer — maps spaCy NER entities to PERSON/LOCATION/ORGANIZATION

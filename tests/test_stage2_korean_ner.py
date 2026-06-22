@@ -134,29 +134,31 @@ class TestPersonDetection:
             )
 
 
-    @pytest.mark.xfail(
-        reason=(
-            "ko_core_news_sm (small model) misclassifies '이영희' as ORGANIZATION "
-            "in bare sentence context without an honorific or label prefix. "
-            "This is a known NER precision gap for the small spaCy Korean model. "
-            "Larger models (ko_core_news_lg) or fine-tuned models improve this."
-        ),
-        strict=True,  # must stay failing — if it passes unexpectedly, update the threshold
-    )
-    def test_person_sentence_context_known_gap(
+    def test_person_sentence_context_bare_name(
         self, ner_engine: KoreanNEREngine
     ) -> None:
         """
-        KNOWN LIMITATION: ko_core_news_sm misclassifies '이영희' as ORGANIZATION
-        in bare sentence context.  Documented as xfail so CI is honest about
-        the model's actual capabilities without hiding the gap.
+        '이영희' in bare sentence context (no honorific / label prefix).
+
+        This was a documented gap for the small ``ko_core_news_sm`` model, which
+        misclassified the name as ORGANIZATION. The larger ``ko_core_news_lg``
+        model (now the default) resolves it. The assertion is therefore enforced
+        on lg and skipped on the sm fallback so CI stays honest about each model.
         """
+        from pii_guard.stage2.korean_ner import resolve_ko_spacy_model
+
         text = "이영희가 오늘 방문하셨습니다."
         detections = ner_engine.detect(text)
         categories = {d.category for d in detections}
-        # This assertion is EXPECTED TO FAIL — the model returns ORGANIZATION,
-        # not PERSON, for this specific name in this context.
-        assert "PERSON" in categories
+
+        if resolve_ko_spacy_model() == "ko_core_news_sm":
+            pytest.skip(
+                "ko_core_news_sm misclassifies '이영희' as ORGANIZATION in bare "
+                "sentence context — known small-model gap, fixed by ko_core_news_lg."
+            )
+        assert "PERSON" in categories, (
+            f"Expected PERSON for {text!r} with the lg model; got {categories}"
+        )
 
 
 class TestPersonAttributes:

@@ -21,7 +21,11 @@ dev = [
 ]
 # Stage-2 NER dependencies (Presidio + Korean spaCy model)
 # Install with: pip install pii-guard[ner]
-# Then run: python -m spacy download ko_core_news_sm
+# Then download a Korean model. ko_core_news_lg is preferred (better PERSON/ORG
+# recall); ko_core_news_sm is a lighter fallback. Model selection is automatic
+# (lg preferred when installed) and overridable via PIIGUARD_KO_SPACY_MODEL.
+#   python -m spacy download ko_core_news_lg   # preferred
+#   python -m spacy download ko_core_news_sm   # lightweight fallback
 ner = [
     "presidio-analyzer>=2.2",
     "presidio-anonymizer>=2.2",
