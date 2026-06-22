@@ -1,0 +1,34 @@
+# Delta round 1 — skip-completed marker for ouroboros run workflow
+#
+# Marks the 7 acceptance criteria delivered by the first workflow run
+# (orchestrator session orch_9b02af28c3eb) as already satisfied by the
+# working tree, so a second run only executes the two criteria added to the
+# seed AFTER that run started:
+#   AC 8 — ProtocolSurfaceCovered (structured parsers + full-body tripwire sweep)
+#   AC 9 — StreamingRehydrationSafe (SSE chunk-boundary look-ahead buffering)
+#
+# Verified locally: 1827 passed, 12 skipped (root+pf(4)+network integration skips).
+# AC numbers are 1-based and match acceptance_criteria order in
+# seed_5cfc8e8ae623.yaml.
+completed_acs:
+  - ac: 1
+    reason: "Cross-provider block/mask of secrets + contact PII, zero-config (verified by test_claude_wire/openai_wire/gemini_wire, test_categories, test_masker)"
+    commit: "89dc5c5ffeba4224c1186821f3ed7e21f18ef878"
+  - ac: 2
+    reason: "Lossless round-trip via indexed placeholders + local rehydration (test_response_rehydration, test_session_map, test_vault)"
+    commit: "89dc5c5ffeba4224c1186821f3ed7e21f18ef878"
+  - ac: 3
+    reason: "Fail-closed on unscannable + Stage2 degrade-to-Stage1 + proxy-crash fail-closed (test_fail_closed, test_crash_fail_closed, test_stage2_degradation)"
+    commit: "89dc5c5ffeba4224c1186821f3ed7e21f18ef878"
+  - ac: 4
+    reason: "Append-only Ledger, HMAC-only, 600/700 perms, rotation/retention/purge (test_ledger)"
+    commit: "89dc5c5ffeba4224c1186821f3ed7e21f18ef878"
+  - ac: 5
+    reason: "Single hot-reloadable YAML policy + secure defaults + out-of-band pin-list approval (test_policy, test_policy_watcher, test_pinlist_guard, test_pinlist_approval)"
+    commit: "89dc5c5ffeba4224c1186821f3ed7e21f18ef878"
+  - ac: 6
+    reason: "Default-on interception via base_url injection + opt-in egress lockdown + honest boundary (test_launcher, test_boundary, test_egress_lockdown_integration)"
+    commit: "89dc5c5ffeba4224c1186821f3ed7e21f18ef878"
+  - ac: 7
+    reason: "Signed/manual rule+model updates, no silent auto-update, Korean red-team corpus + golden regression (test_signed_updates, test_rule_update_regression_guard, test_korean_pii_corpus/regression)"
+    commit: "89dc5c5ffeba4224c1186821f3ed7e21f18ef878"
