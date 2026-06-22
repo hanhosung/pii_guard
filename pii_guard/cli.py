@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .boundary import EnforcementTier, get_protection_boundary, print_boundary_report
+from .engine import Engine
 from .ledger import Ledger
 from .pf_manager import PfManager, PfRuleError
 from .pinlist_approval import PinListApprovalGate, run_interactive_approval
@@ -113,10 +114,22 @@ def cmd_serve(args: argparse.Namespace) -> int:
     signal.  SIGTERM / SIGINT trigger a graceful shutdown; SIGKILL terminates
     immediately (OS handles connection reset).
     """
+    # Secure-by-default: wire the Stage-2 Korean NER engine into the proxy so
+    # unstructured PII (person names, addresses, organizations) is masked, not
+    # just Stage-1 regex categories. The runner is subprocess-isolated and
+    # degrades gracefully to Stage-1 if NER deps/model are unavailable or the
+    # worker OOMs/times out (AC 3). Use --no-ner to run Stage-1 only.
+    engine: Optional[Engine] = None
+    if not getattr(args, "no_ner", False):
+        from .stage2.runner import Stage2NERRunner
+
+        engine = Engine(stage2_runner=Stage2NERRunner())
+
     proxy = PIIGuardProxy(
         args.upstream_url,
         host=args.host,
         port=args.port,
+        engine=engine,
     )
     proxy.start()
 
@@ -529,6 +542,15 @@ def build_parser() -> argparse.ArgumentParser:
         default="127.0.0.1",
         metavar="HOST",
         help="local address to bind (default: 127.0.0.1)",
+    )
+    serve_parser.add_argument(
+        "--no-ner",
+        action="store_true",
+        help=(
+            "disable Stage-2 Korean NER (run Stage-1 regex only). NER is ON by "
+            "default so person names / addresses / organizations are masked; this "
+            "flag is an escape hatch for minimal/low-resource deployments."
+        ),
     )
     serve_parser.set_defaults(func=cmd_serve)
 
