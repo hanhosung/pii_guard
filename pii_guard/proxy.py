@@ -72,6 +72,8 @@ from .providers.claude import scrub_claude_request
 from .providers.gemini import scrub_gemini_request
 from .providers.openai import scrub_openai_request
 from .response_rehydrator import ResponsePostProcessor, RehydrationResult
+from .streaming_rehydrator import StreamingSSERehydrator
+from .tripwire import TripwireResult, sweep_raw_body
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,6 +98,9 @@ _GEMINI_PATH_RE = re.compile(
 
 #: JSON content type used for blocked/error responses
 _JSON_CONTENT_TYPE = "application/json"
+
+#: Read chunk size for streaming SSE responses (bytes)
+_STREAM_CHUNK_SIZE: int = 4096
 
 #: Response body returned for blocked requests
 _BLOCKED_RESPONSE = json.dumps({
@@ -218,6 +223,10 @@ class PIIGuardProxy:
         self._last_scrub_result: Optional[Any] = None
         self._last_scrub_lock = threading.Lock()
 
+        # Keep a record of the last tripwire result for test inspection
+        self._last_tripwire_result: Optional[TripwireResult] = None
+        self._last_tripwire_lock = threading.Lock()
+
         # Keep a record of the last rehydration result for test inspection
         self._last_rehydration_result: Optional[RehydrationResult] = None
         self._last_rehydration_lock = threading.Lock()
@@ -324,6 +333,23 @@ class PIIGuardProxy:
         return self._response_processor.terminal_restore
 
     @property
+    def last_tripwire_result(self) -> Optional[TripwireResult]:
+        """
+        The :class:`~pii_guard.tripwire.TripwireResult` from the most recent
+        full-body tripwire sweep, or ``None`` if no request with a known
+        provider has been processed yet.
+
+        The tripwire runs on the *sanitised* payload (after the provider-specific
+        scrubber has replaced PII in known fields with placeholders).  Any hit in
+        this result therefore represents a coverage gap — PII found in a
+        non-standard or nested field that the structured parser did not visit.
+
+        Thread-safe snapshot; primarily used by tests and diagnostics.
+        """
+        with self._last_tripwire_lock:
+            return self._last_tripwire_result
+
+    @property
     def last_rehydration_result(self) -> Optional[RehydrationResult]:
         """
         The :class:`~pii_guard.response_rehydrator.RehydrationResult` from the
@@ -402,7 +428,20 @@ class PIIGuardProxy:
             with self._last_scrub_lock:
                 self._last_scrub_result = scrub_result
 
-            if scrub_result.should_block:
+            # ── 3b. Full-body tripwire sweep (Sub-AC 8.2) ─────────────────
+            # Run the complementary tripwire on the *sanitised* payload JSON.
+            # Because the structured scrubber has already replaced PII in known
+            # fields with [PLACEHOLDER_N] tokens, any PII the tripwire finds
+            # here definitively lives in a non-standard or nested field that the
+            # provider parser did not visit — a true coverage gap.
+            tripwire_result = self._run_tripwire(scrub_result.sanitized_payload)
+            with self._last_tripwire_lock:
+                self._last_tripwire_result = tripwire_result
+
+            # Merge blocking decision: block if *either* the structured scrubber
+            # or the tripwire demands it (fail-closed on coverage gaps with
+            # BLOCK-category PII).
+            if scrub_result.should_block or tripwire_result.should_block:
                 self._send_response_bytes(
                     handler, 400, _BLOCKED_RESPONSE, _JSON_CONTENT_TYPE
                 )
@@ -488,6 +527,41 @@ class PIIGuardProxy:
             else:
                 raise ValueError(f"Unknown provider: {provider!r}")
 
+    def _run_tripwire(self, sanitized_payload: Dict[str, Any]) -> TripwireResult:
+        """
+        Run the full-body tripwire sweep on the *sanitised* payload.
+
+        Serialises *sanitized_payload* to JSON and passes it through
+        :func:`~pii_guard.tripwire.sweep_raw_body`.  Because the provider
+        scrubber has already masked PII in the fields it knows about, any
+        hit found here lives in a non-standard field the structured parser
+        did not visit.
+
+        Called under the engine lock (the caller holds it before calling
+        :meth:`_scrub`, which is the only concurrent mutation point).
+        The tripwire itself is stateless so it does not need a separate lock.
+
+        Parameters
+        ----------
+        sanitized_payload:
+            The scrubbed payload dict returned by the provider scrubber.
+
+        Returns
+        -------
+        TripwireResult
+            Hits found in the serialised sanitised payload, representing
+            coverage gaps from the structured parser.
+        """
+        try:
+            sanitized_json = json.dumps(sanitized_payload, ensure_ascii=False)
+            return sweep_raw_body(sanitized_json)
+        except Exception:  # noqa: BLE001
+            # If the tripwire itself fails, return an empty (non-blocking) result
+            # rather than crashing the proxy.  The structured scrubber's decision
+            # stands.  Infrastructure-level failures in the tripwire are logged
+            # separately by the caller when inspecting last_tripwire_result.
+            return TripwireResult()
+
     def _forward(
         self,
         handler: BaseHTTPRequestHandler,
@@ -506,6 +580,11 @@ class PIIGuardProxy:
         is passed through the :class:`~pii_guard.response_rehydrator.ResponsePostProcessor`
         before being returned to the calling agent.  ``[CATEGORY_N]`` tokens are
         replaced with their original values from the session mapping store.
+
+        Streaming SSE responses (``Content-Type: text/event-stream``) are
+        handled by :meth:`_forward_streaming`, which wires the look-ahead
+        buffer into the live event stream and forwards rehydrated chunks
+        immediately, preserving streaming TTFT (Sub-AC 9.2).
 
         Terminal-rendered output rehydration is controlled by the
         ``terminal_restore`` flag on the :attr:`_response_processor` (default OFF).
@@ -530,16 +609,24 @@ class PIIGuardProxy:
 
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
-                resp_body = resp.read()
-                # ── Response rehydration (Sub-AC 2c) ─────────────────────────
-                resp_body = self._rehydrate_response(resp_body, path)
-                handler.send_response(resp.status)
-                for key, value in resp.headers.items():
-                    if key.lower() not in {"transfer-encoding", "connection", "content-length"}:
-                        handler.send_header(key, value)
-                handler.send_header("Content-Length", str(len(resp_body)))
-                handler.end_headers()
-                handler.wfile.write(resp_body)
+                content_type = resp.headers.get("Content-Type", "")
+                is_sse = "text/event-stream" in content_type
+
+                if is_sse and self._rehydrate_responses:
+                    # ── Streaming SSE path (Sub-AC 9.2) ──────────────────────
+                    self._forward_streaming(handler, resp, path)
+                else:
+                    # ── Buffered (non-streaming) path ─────────────────────────
+                    resp_body = resp.read()
+                    # ── Response rehydration (Sub-AC 2c) ─────────────────────
+                    resp_body = self._rehydrate_response(resp_body, path)
+                    handler.send_response(resp.status)
+                    for key, value in resp.headers.items():
+                        if key.lower() not in {"transfer-encoding", "connection", "content-length"}:
+                            handler.send_header(key, value)
+                    handler.send_header("Content-Length", str(len(resp_body)))
+                    handler.end_headers()
+                    handler.wfile.write(resp_body)
         except urllib.error.HTTPError as exc:
             resp_body = exc.read()
             handler.send_response(exc.code)
@@ -558,6 +645,87 @@ class PIIGuardProxy:
                 handler, 502,
                 {"error": f"upstream I/O error: {exc}"}
             )
+
+    def _forward_streaming(
+        self,
+        handler: BaseHTTPRequestHandler,
+        resp: Any,
+        path: str,
+    ) -> None:
+        """
+        Forward a streaming SSE response with look-ahead placeholder rehydration.
+
+        Reads the upstream SSE stream in 4 KiB chunks, feeds each chunk through
+        :class:`~pii_guard.streaming_rehydrator.StreamingSSERehydrator`, and
+        writes rehydrated output to the client **immediately** — without waiting
+        for the full response.  This preserves streaming TTFT while ensuring no
+        ``[CATEGORY_N]`` placeholder token appears in the forwarded bytes.
+
+        Parameters
+        ----------
+        handler:
+            The per-request HTTP handler (provides ``send_response`` and
+            ``wfile`` for writing to the client).
+        resp:
+            The ``http.client.HTTPResponse`` returned by ``urlopen``.
+        path:
+            The original request path, used for provider detection.
+        """
+        provider = _detect_provider(path)
+
+        with self._engine_lock:
+            restoration_map = dict(self.engine.restoration_map)
+
+        rehydrator = StreamingSSERehydrator(
+            restoration_map=restoration_map,
+            provider=provider,
+        )
+
+        # ── Send response headers to client (no Content-Length for streaming) ──
+        handler.send_response(resp.status)
+        for key, value in resp.headers.items():
+            if key.lower() not in {
+                "transfer-encoding", "connection", "content-length"
+            }:
+                handler.send_header(key, value)
+        # Use Connection: close so the client knows when the stream ends
+        handler.send_header("Connection", "close")
+        handler.end_headers()
+
+        # ── Stream chunks ────────────────────────────────────────────────────
+        # Use resp.fp.read1() instead of resp.read() to get true streaming
+        # behaviour.  resp.read(n) (via HTTPResponse) calls readinto(bytearray(n))
+        # which blocks until *n* bytes are available or EOF — killing TTFT for
+        # small SSE frames delivered in multiple chunks.  BufferedReader.read1(n)
+        # performs at most ONE underlying read() syscall and returns whatever is
+        # already in the socket buffer, enabling per-chunk delivery.
+        raw_reader = getattr(resp, "fp", None)
+        use_read1 = raw_reader is not None and hasattr(raw_reader, "read1")
+
+        try:
+            while True:
+                if use_read1:
+                    chunk = raw_reader.read1(_STREAM_CHUNK_SIZE)
+                else:
+                    # Fallback: standard read — correct but blocks until EOF
+                    # on small responses (loses streaming TTFT).
+                    chunk = resp.read(_STREAM_CHUNK_SIZE)
+                if not chunk:
+                    break
+                output = rehydrator.feed_chunk(chunk)
+                if output:
+                    handler.wfile.write(output)
+                    handler.wfile.flush()
+
+            # ── Flush look-ahead buffer tail ─────────────────────────────────
+            tail = rehydrator.flush()
+            if tail:
+                handler.wfile.write(tail)
+                handler.wfile.flush()
+
+        except OSError:
+            # Client disconnected or upstream closed unexpectedly — stop silently.
+            pass
 
     def _rehydrate_response(self, resp_body: bytes, path: str) -> bytes:
         """

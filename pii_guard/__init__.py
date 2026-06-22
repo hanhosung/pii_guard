@@ -39,7 +39,9 @@ from .policy import (
 from .proxy import PIIGuardProxy
 from .response_rehydrator import RehydrationResult, ResponsePostProcessor
 from .session_map import SessionMap
+from .streaming_buffer import StreamingLookAheadBuffer
 from .vault import RequestVault, apply_mask_style, mask_payload_with_vault
+from .tripwire import TripwireHit, TripwireResult, sweep_raw_body
 from .updater import (
     ManifestEntry,
     UpdateManifest,
@@ -101,6 +103,8 @@ __all__ = [
     # Response rehydration post-processor (Sub-AC 2c)
     "ResponsePostProcessor",
     "RehydrationResult",
+    # Streaming SSE look-ahead buffer (Sub-AC 9.1)
+    "StreamingLookAheadBuffer",
     # Audit Ledger (Sub-AC 4.1)
     "Ledger",
     "LedgerEventType",
@@ -132,6 +136,10 @@ __all__ = [
     "RequestVault",
     "apply_mask_style",
     "mask_payload_with_vault",
+    # Full-body tripwire sweep (Sub-AC 8.2)
+    "TripwireHit",
+    "TripwireResult",
+    "sweep_raw_body",
     # Signed-channel update mechanism (Sub-AC 7.1)
     "ManifestEntry",
     "UpdateManifest",
