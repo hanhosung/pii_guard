@@ -15,9 +15,12 @@ Protocol
 Worker types
 ------------
 ``default_ner_worker_loop``
-    Production stub — returns empty detections (Stage-1 already covered the
-    high-recall pass).  Replace the body of ``_run_ner()`` with a real spaCy
-    or HuggingFace NER call when a model is available.
+    Production worker — loads Presidio with a spaCy Korean model
+    (``ko_core_news_sm``) lazily on first request and runs NER on subsequent
+    calls.  Detects Korean PERSON, ADDRESS (location), and ORGANIZATION
+    entities with non-zero confidence scores.  Gracefully falls back on
+    MemoryError or any unexpected exception by sending an ``("error", ...)``
+    response so the runner can degrade to Stage-1.
 
 ``_test_noop_worker``
     Test helper — responds immediately with an empty list.
@@ -53,20 +56,32 @@ def default_ner_worker_loop(req_q, resp_q) -> None:  # pragma: no cover
     """
     Production Stage2 NER worker loop.
 
-    Stub implementation: no NER model loaded, returns empty detections.
-    To integrate a real model, replace ``_run_ner()`` with your model call.
-    The function runs in a long-lived subprocess; import the model once (lazily)
-    before the loop begins to amortise start-up cost across requests.
+    Uses :class:`~pii_guard.stage2.korean_ner.KoreanNEREngine` (Presidio
+    orchestrating ``ko_core_news_sm``) to detect Korean PERSON, ADDRESS
+    (location), and ORGANIZATION entities in unstructured text.
+
+    The engine is initialised lazily on the first request so model loading
+    cost is paid once per subprocess lifetime.  Subsequent requests reuse the
+    already-loaded model.
+
+    Failure handling:
+    - ``MemoryError``: caught and reported as an error response so the runner
+      can degrade to Stage-1 without crashing the subprocess.
+    - Any other exception: caught and reported; the subprocess stays alive.
+    - Idle for 60 s: exits cleanly so the process does not linger.
     """
+    # KoreanNEREngine is imported inside the subprocess so the spaCy model
+    # is never loaded in the parent (forwarding core) process.
+    _engine = None  # lazy singleton within this subprocess
 
     def _run_ner(text: str):
-        # ── Integration point ─────────────────────────────────────────────────
-        # Example (spaCy):
-        #   import spacy
-        #   nlp = spacy.load("en_core_web_sm")
-        #   doc = nlp(text)
-        #   return [_ent_to_detection(ent) for ent in doc.ents]
-        return []  # stub — Stage-1 regex/checksum is the only active stage
+        nonlocal _engine
+        if _engine is None:
+            # Deferred import: keeps the main process clean.
+            # This import triggers spaCy model loading on first call.
+            from pii_guard.stage2.korean_ner import KoreanNEREngine  # noqa: PLC0415
+            _engine = KoreanNEREngine()
+        return _engine.detect(text)
 
     while True:
         try:

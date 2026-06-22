@@ -221,6 +221,22 @@ ADDRESS = CategorySpec(
     rules=_ADDRESS_RULES,
 )
 
+# ── ORGANIZATION — Korean/general organization names ──────────────────────────
+# This is a Stage-2-only category: Stage-1 regex cannot reliably detect
+# organization names in unstructured text (too many false positives).
+# Stage-2 NER (KoreanNEREngine / ko_core_news_sm via Presidio) detects OG labels.
+# No Stage-1 rules are defined — the empty rules list means Stage-1 scanning
+# skips this category entirely.  Policy and CATEGORY_MAP lookups still work.
+ORGANIZATION = CategorySpec(
+    category="ORGANIZATION",
+    category_class=CategoryClass.KOREAN_PII,
+    action=Action.TOKENIZE_ROUNDTRIP,
+    mask_style=MaskStyle.TOKENIZE,
+    min_confidence=0.70,
+    rules=[],  # Stage-2 NER only; no regex rules
+    detection_stage=DetectionStage.STAGE2_NER,
+)
+
 # ── RRN — Korean Resident Registration Number ─────────────────────────────────
 # Format: YYMMDD-NNNNNNN   (7th digit 1-4 = Korean national, 5-8 = foreigner)
 # RRN uses digits 1-4 as 7th (block both but classify separately)
@@ -710,6 +726,8 @@ ALL_CATEGORIES: List[CategorySpec] = [
     KR_ACCOUNT,
     PERSON,
     ADDRESS,
+    # Stage-2-only Korean categories (no Stage-1 rules; NER detection only)
+    ORGANIZATION,
 ]
 
 CATEGORY_MAP = {spec.category: spec for spec in ALL_CATEGORIES}
