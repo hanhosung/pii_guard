@@ -8,9 +8,10 @@
 ## 0. 한 줄 요약
 
 ouroboros 워크플로로 개발 중인 **로컬 우선(local-first) LLM 게이트웨이 PII/시크릿 차단 에이전트**.
-1차(AC 1–7) → 2차 델타(AC 8·9) → 3차 델타(AC 10 NER)까지 완료. **10개 AC 전부 구현·커밋됨.**
-**로컬 전체 테스트 2624 passed / 0 failed (`.venv` 필요 — presidio+spaCy).**
-> 3차는 오케스트레이터가 "실패"로 보고했으나 실제 코드는 건전함(타임아웃+DAG blocked). §0.6 참고.
+1차(AC 1–7) → 2차 델타(AC 8·9) → 3차 델타(AC 10 NER) → lg 업그레이드 → **E2E 검증·통합수정**까지 완료.
+**10개 AC 전부 구현·커밋, 로컬 전체 테스트 2630 passed / 0 failed (`.venv` 필요 — presidio+spaCy lg).**
+> ⚠️ E2E 스모크가 **운영 통합 갭**을 발견·수정함: serve 프록시가 NER을 연결 안 해 한국어 이름이
+> 그대로 유출되던 버그 → `57a6189`에서 수정(default-on). §0.7 참고.
 
 ---
 
@@ -72,6 +73,30 @@ cd /Users/ho/workspace/Monoly_genAI/pii_guard
 #   (lg 권장. 가벼운 폴백은 ko_core_news_sm)
 # (NER 미설치 시에도 graceful degrade — 시스템 python으로도 수집/대부분 통과하나 NER 테스트는 스킵/저하)
 ```
+
+---
+
+## 0.7 ✅ 실제 E2E 스모크 — 운영 통합 갭 발견·수정 (중요)
+
+> `scripts/e2e_smoke.py` — **실제 `piiguard serve` 프록시 서브프로세스 + mock 업스트림**으로
+> 진짜 요청을 흘려 검증. (단위테스트 2630개가 못 잡은 통합 결함을 잡아냄.)
+
+**발견한 버그**: `cmd_serve`가 프록시를 기본 `Engine()`(Stage2 NER **미연결**)로 생성 → 운영 시
+프록시가 Stage1 정규식만 적용하고 **한국어 이름·주소·조직을 그대로 업스트림에 유출**. NER 엔진(AC 10)은
+단위테스트로만 검증됐고 실제 요청 경로엔 닿지 않았음. (AC 1의 "every outbound request" 위반)
+
+**수정 (`57a6189`)**: serve가 `Engine(stage2_runner=Stage2NERRunner())`를 기본 연결(secure-by-default),
+`--no-ner` opt-out 추가. 서브프로세스 격리 + Stage1 graceful degrade 유지.
+
+**E2E 검증 결과 (수정 후 전부 PASS)**:
+| 시나리오 | 결과 |
+|---|---|
+| MASK — `김민수`/전화 → 업스트림 도달 전 placeholder 치환 | ✅ |
+| REHYDRATE — 업스트림 응답의 `[PERSON_1]` → 클라이언트 응답에서 `김민수` 복원 | ✅ |
+| BLOCK — AWS 키 → 400, 업스트림 호출 안 됨 | ✅ |
+
+회귀 방지: `tests/test_serve_ner_wiring.py`(wiring 기본 on 보장) + `scripts/e2e_smoke.py`(수동 E2E).
+재실행: `.venv/bin/python scripts/e2e_smoke.py`
 
 ---
 
@@ -171,45 +196,28 @@ AC 9: pii_guard/streaming_buffer.py            (경계 룩어헤드 버퍼)
 
 ## 6. 다음 세션 할 일 (체크리스트)
 
-### A. 먼저 2차 델타 상태 확인 (AC 8·9)
-세션 `orch_0beb4d187a02`가 **아직 실행 중인지 / 끝났는지 / 끊겼는지** 확인 (§0.5의 쿼리 사용,
-`ls ~/.ouroboros/locks/`).
-- **끊겼다면 resume** (AC 8·9 이어감, **NER 아님**):
-  ```bash
-  cd /Users/ho/workspace/Monoly_genAI/pii_guard
-  ouroboros run workflow /Users/ho/.ouroboros/seeds/seed_5cfc8e8ae623.yaml \
-    --orchestrator --resume orch_0beb4d187a02 \
-    --skip-completed docs/delta/completed_round1.yaml
-  ```
-- **끝났다면** → §B 검증으로.
+> **핵심 개발은 끝남**: 10개 AC 전부 구현·커밋, 2630 테스트 통과, E2E 마스킹/차단/복원 검증 완료.
+> 아래는 마무리·운영화·선택 항목.
 
-### A-2. 3차 실행 — AC 10(NER), **새 run으로 시작 (resume 아님)**
-> ⚠️ 2차 세션은 9-AC 스냅샷이라 AC 10이 없음. resume으로는 NER이 안 됨. **반드시 새 `run workflow`**로
-> 10-AC 시드를 다시 로드해야 함. AC 8·9가 working tree에 이미 있으면 마커에 추가해 skip 권장.
+### A. ouroboros 4차 실행 — 깔끔한 종결 (준비 완료, 콘솔 실행만 남음)
+마커가 전 10개 AC를 satisfied로 표시 → 4차는 clean 10/10로 닫힘 (3차 timeout/blocked 재발 없음):
 ```bash
 cd /Users/ho/workspace/Monoly_genAI/pii_guard
-# (선택) AC 8·9 검증·커밋 후 completed_round1.yaml에 8,9 추가 → AC 10만 실행됨
 ouroboros run workflow /Users/ho/.ouroboros/seeds/seed_5cfc8e8ae623.yaml \
-  --runtime claude \
-  --skip-completed docs/delta/completed_round1.yaml
+  --runtime claude --skip-completed docs/delta/completed_round1.yaml
 ```
-- NER은 무거움: spaCy 한국어 모델(`ko_core_news_*`, 수백 MB) + `presidio-analyzer` 설치 필요.
-  인터넷 + 디스크 여유 확인. `pyproject.toml`에 의존성 추가될 것.
+- [ ] 실행 후 `Success: 10/10, Failed: 0` 확인. QA가 REVISE면 증거-가시성 이슈(코드 아님).
 
-### B. 검증 (델타 완료 후)
-- [ ] **AC 9 TTFT 실패 2건 원인 규명** — flaky인지 실제 결함인지. 실제면 버퍼 방출 로직 수정.
-- [ ] **AC 10 확인** — `pii_guard/stage2/_workers.py`의 `_run_ner()`가 스텁이 아니라 실제
-      spaCy/Presidio 호출인지. `grep -n "spacy\|presidio" pii_guard/stage2/`.
-- [ ] **AC 8 확인** — `tripwire.py`가 미파싱 필드 PII를 실제로 잡는지, `*_parser.py`가
-      `unknown_field_action`으로 미지 필드를 차단/경고하는지.
-- [ ] **전체 테스트** `python3 -m pytest -q -p no:cacheprovider` → 0 failed 목표.
-- [ ] **degradation 보존 확인** — NER 추가 후에도 OOM/타임아웃 시 Stage1 폴백 유지되는지
-      (`test_stage2_degradation.py` 통과).
+### B. 남은 운영화 / 미뤄둔 요구사항 (Tier 2)
+- [ ] **hwp/OCR 문서 처리** (§19 2차 단계) — 현재 unscannable→block(fail-closed)만. 실제 OCR 미구현.
+- [ ] **egress 락다운 실검증** — root+pf(4)+실네트워크 필요한 통합테스트 12개가 항상 skip. 실제
+      macOS pf 차단을 한 번도 실행 안 함. `sudo .venv/bin/python -m pytest -m integration` 필요.
+- [ ] **부트스트랩 자동화** — 새 환경에서 `pip install -e ".[ner,dev]" + spacy download lg`를 스크립트화.
 
-### C. 정리
-- [ ] 검증 통과 시 working tree 변경 **커밋** (AC 8·9·10 묶거나 단계별로).
-- [ ] 통과 시 `docs/delta/completed_round1.yaml`에 AC 8·9·10 추가하거나 round2 마커 작성.
-- [ ] 최종 QA verdict 재확인 (1차 QA는 0.66 REVISE — 주로 git 부재·증거 가시성 문제였음, 현재 git 초기화로 일부 해소).
+### C. 선택적 품질 향상 (Tier 3)
+- [ ] **AC 8 depth-warning** — leaf 8.1.1–8.1.3, 8.3.1–8.3.2가 atomic 강제됨. tripwire/parser 커버리지 수동 리뷰.
+- [ ] **PERSON recall 추가** — 현재 lg로 0.84. honorific 룰("~님/~씨/이름:")이나 fine-tuned 모델로 향상 여지.
+- [ ] **E2E 확장** — `scripts/e2e_smoke.py`에 OpenAI/Gemini 포맷, 스트리밍(SSE) 경계, tool_use/document 블록 시나리오 추가.
 
 ---
 
