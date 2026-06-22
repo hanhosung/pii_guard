@@ -1,16 +1,16 @@
-# Delta round 1 — skip-completed marker for ouroboros run workflow
+# Delta skip-completed marker for ouroboros run workflow
 #
-# Marks the 7 acceptance criteria delivered by the first workflow run
-# (orchestrator session orch_9b02af28c3eb) as already satisfied by the
-# working tree, so a second run only executes the criteria added to the
-# seed AFTER that run started:
-#   AC 8  — ProtocolSurfaceCovered (structured parsers + full-body tripwire sweep)
-#   AC 9  — StreamingRehydrationSafe (SSE chunk-boundary look-ahead buffering)
+# Updated for the 3rd run: AC 1-9 are now satisfied + committed, so the 3rd run
+# only executes the one remaining criterion:
 #   AC 10 — Stage2EngineImplemented (real Presidio + spaCy Korean NER, replacing the stub)
 #
-# Verified locally: 1827 passed, 12 skipped (root+pf(4)+network integration skips).
-# AC numbers are 1-based and match acceptance_criteria order in
-# seed_5cfc8e8ae623.yaml.
+# History:
+#   AC 1-7  — delivered by 1st workflow run (orch_9b02af28c3eb), committed in 89dc5c5
+#   AC 8-9  — delivered by 2nd delta run   (orch_0beb4d187a02), committed in 56250c6 + e89f78d
+#
+# Verified locally before this marker: 2508 passed, 12 skipped, 0 failed
+# (skips require root+pf(4)+network). AC numbers are 1-based and match
+# acceptance_criteria order in seed_5cfc8e8ae623.yaml.
 completed_acs:
   - ac: 1
     reason: "Cross-provider block/mask of secrets + contact PII, zero-config (verified by test_claude_wire/openai_wire/gemini_wire, test_categories, test_masker)"
@@ -33,3 +33,9 @@ completed_acs:
   - ac: 7
     reason: "Signed/manual rule+model updates, no silent auto-update, Korean red-team corpus + golden regression (test_signed_updates, test_rule_update_regression_guard, test_korean_pii_corpus/regression)"
     commit: "89dc5c5ffeba4224c1186821f3ed7e21f18ef878"
+  - ac: 8
+    reason: "ProtocolSurfaceCovered: per-provider structured parsers + full-body tripwire sweep + unknown_field_action coverage alarm (claude/openai/gemini_parser, tripwire, schema_coverage, coverage_alarm; test_*_parser, test_tripwire, test_schema_coverage, test_coverage_alarm)"
+    commit: "e89f78d"
+  - ac: 9
+    reason: "StreamingRehydrationSafe: bounded look-ahead buffering reassembles placeholders across SSE chunk boundaries, TTFT preserved (streaming_buffer, streaming_rehydrator; test_streaming_buffer, test_streaming_rehydration_integration — TTFT tests pass)"
+    commit: "e89f78d"
