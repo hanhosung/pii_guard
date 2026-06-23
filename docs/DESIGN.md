@@ -1,7 +1,7 @@
 # PII-Guard — 설계 문서 (Design Document, as-built)
 
 > 버전: 1.0 · 작성: 2026-06-23 · 대상 커밋: `a0e925c` 기준
-> 짝 문서: [`pii-guard-requirements.md`](../../pii-guard-requirements.md) (요구사항 v2 + v3 보완 §23)
+> 짝 문서: [`pii-guard-requirements.md`](./pii-guard-requirements.md) (요구사항 v2 + v3 보완 §23)
 > 본 문서는 **실제 구현된 시스템(as-built)**을 기술한다. 요구사항의 "무엇을/왜"에 대해, 본 문서는 "어떻게"를 다룬다.
 
 ---

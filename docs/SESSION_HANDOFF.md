@@ -105,7 +105,7 @@ cd /Users/ho/workspace/Monoly_genAI/pii_guard
 | 항목 | 값 |
 |---|---|
 | 프로젝트 루트 | `/Users/ho/workspace/Monoly_genAI/pii_guard/` |
-| 요구사항 문서 | `/Users/ho/workspace/Monoly_genAI/pii-guard-requirements.md` |
+| 요구사항 문서 | `pii_guard/docs/pii-guard-requirements.md` (v2 + v3 보완 §23) |
 | Seed 파일 | `/Users/ho/.ouroboros/seeds/seed_5cfc8e8ae623.yaml` (현재 **10 AC**) |
 | 델타 마커 | `pii_guard/docs/delta/completed_round1.yaml` (AC 1–7 완료 표시) |
 | ouroboros 패키지 | `uvx --from "ouroboros-ai[mcp,claude]" ouroboros ...` |
