@@ -280,7 +280,10 @@ def run():
         rows.append({**{k: it[k] for k in ("id", "title", "kind")},
                      "n_gt": len(it["gt"]), "tp": len(tp), "fn": len(fn),
                      "len": len(it["text"]), "si_tp": len(si_tp), "si_fn": len(si_fn),
-                     "fn_items": fn, "block": res.has_blocks})
+                     "fn_items": fn, "block": res.has_blocks,
+                     "text": it["text"], "gt": it["gt"], "tp_items": tp,
+                     "server_info": it["server_info"], "si_fn_items": si_fn,
+                     "dets": dets})
 
     # 집계
     voc_tp, voc_fn = agg["VOC"]["tp"], agg["VOC"]["fn"]
@@ -369,6 +372,48 @@ def generate_md(s, items):
     W("```bash")
     W("PYTHONPATH=. .venv/bin/python validation/voc_server_test.py")
     W("```")
+    W("")
+    W("---")
+    W("")
+    W("## 부록 A. 전체 60항목 — 텍스트 · 심은 값 · 검출 결과")
+    W("")
+    W("> 각 항목의 **원문 전체**, 심은 PII/시크릿/서버정보(ground truth), 검출/미검출을 기록한다.")
+    W("> 원시 탐지 덤프는 [`voc_server_log.txt`](./voc_server_log.txt) 참조.")
+    W("")
+
+    def _render(group_rows, heading):
+        W(f"## 부록 {heading}")
+        W("")
+        for row in group_rows:
+            blk = " · 🔴 일부 차단(block)" if row["block"] else ""
+            W(f"### [{row['id']:02d}] {row['title']}  ({row['len']}자){blk}")
+            W("")
+            W("**텍스트(원문):**")
+            W("")
+            W("```")
+            W(row["text"])
+            W("```")
+            W("")
+            gt = ", ".join(f"`{c}`={v}" for c, v in row["gt"]) or "—"
+            si_gt = ", ".join(f"`{c}`={v}" for c, v in row["server_info"]) or "—"
+            tp = ", ".join(f"`{c}`={v}" for c, v in row["tp_items"]) or "—"
+            fn = ", ".join(f"`{c}`={v}" for c, v in row["fn_items"]) or "—"
+            sifn = ", ".join(f"`{c}`={v}" for c, v in row["si_fn_items"]) or "—"
+            W(f"- **심은 PII/시크릿({row['n_gt']})**: {gt}")
+            if row["server_info"]:
+                W(f"- **심은 서버정보({len(row['server_info'])})**: {si_gt}")
+            W(f"- ✅ **검출({row['tp']})**: {tp}")
+            W(f"- ❌ **미검출({row['fn']})**: {fn}")
+            if row["server_info"]:
+                W(f"- 서버정보 검출 {row['si_tp']}/{row['si_tp']+row['si_fn']}" +
+                  (f" · 미검출: {sifn}" if row["si_fn"] else ""))
+            W("")
+
+    voc_rows = [r for r in s["rows"] if r["kind"] == "VOC"]
+    log_rows = [r for r in s["rows"] if r["kind"] == "LOG"]
+    _render(voc_rows, "A-1. VOC 고객 문의 30건 (~2000자)")
+    _render(log_rows, "A-2. 서버 console 로그 30건 (~3000자)")
+
     open(MD_PATH, "w", encoding="utf-8").write("\n".join(o))
 
 
