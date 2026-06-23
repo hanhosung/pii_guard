@@ -43,12 +43,10 @@ TEXT:
 GROUND TRUTH (5): AWS_SECRET=AKIAIOSFODNN7EXAMPLE, API_KEY=sk-abcdefghijklmnopqrstuvwxyz1234567890, API_KEY=ghp_1234567890abcdefghijklmnopqrstuvwxyz12, PASSWORD=Sup3rSecret!2024, PERSON=박지훈
 TRAPS (탐지되면 오탐): #1423, v2.3.1
 
-RAW DETECTIONS (7):
-  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'AWS'
+RAW DETECTIONS (5):
   · AWS_SECRET     [BLOCK] 'AKIAIOSFODNN7EXAMPLE'
   · API_KEY        [BLOCK] 'sk-abcdefghijklmnopqrstuvwxyz1234567890'
   · API_KEY        [BLOCK] 'ghp_1234567890abcdefghijklmnopqrstuvwxyz12'
-  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'rotate'
   · PASSWORD       [BLOCK] 'Sup3rSecret!2024'
   · PERSON         [TOKENIZE_ROUNDTRIP] '박지훈'
 
@@ -59,9 +57,7 @@ RAW DETECTIONS (7):
   · PASSWORD       'Sup3rSecret!2024'
   · PERSON         '박지훈'
 ❌ 미검출 FN (0):
-⚠️  오탐 후보 FP (2):
-  · ORGANIZATION   'AWS'
-  · ORGANIZATION   'rotate'
+⚠️  오탐 후보 FP (0):
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [03] 병원 접수 안내 이메일
@@ -72,12 +68,10 @@ TEXT:
 GROUND TRUTH (7): PERSON=이도현, PHONE=010-7788-9900, RRN=770123-4279267, EMAIL=dohyun.lee@daum.net, ADDRESS=서울 송파구 올림픽로 300, CARD=5500-0055-5555-5559, PERSON=최민호
 TRAPS (탐지되면 오탐): 1988-03-12, 12가 3456
 
-RAW DETECTIONS (9):
+RAW DETECTIONS (7):
   · PERSON         [TOKENIZE_ROUNDTRIP] '이도현'
-  · ADDRESS        [TOKENIZE_ROUNDTRIP] '생년월일'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-7788-9900'
   · RRN            [BLOCK] '770123-4279267'
-  · PERSON         [TOKENIZE_ROUNDTRIP] '문진표'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'dohyun.lee@daum.net'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 송파구 올림픽로 300'
   · CARD           [BLOCK] '5500-0055-5555-5559'
@@ -92,9 +86,7 @@ RAW DETECTIONS (9):
   · CARD           '5500-0055-5555-5559'
   · PERSON         '최민호'
 ❌ 미검출 FN (0):
-⚠️  오탐 후보 FP (2):
-  · ADDRESS        '생년월일'
-  · PERSON         '문진표'
+⚠️  오탐 후보 FP (0):
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [04] 채용 지원 서류 요약
@@ -105,13 +97,12 @@ TEXT:
 GROUND TRUTH (8): PERSON=강하늘, PHONE=010-2233-4455, EMAIL=haneul.kang@kakao.com, ADDRESS=경기도 성남시 분당구 판교역로 235, ORGANIZATION=네이버, PHONE=010-9001-2002, PASSPORT=M12345678, DRIVER_LICENSE=11-19-123456-01
 TRAPS (탐지되면 오탐): 6,500만원, 2015년
 
-RAW DETECTIONS (8):
+RAW DETECTIONS (7):
   · PERSON         [TOKENIZE_ROUNDTRIP] '강하늘'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-2233-4455'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'haneul.kang@kakao.com'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '경기도 성남시 분당구 판교역로 235'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-9001-2002'
-  · PERSON         [TOKENIZE_ROUNDTRIP] '여권번호'
   · PASSPORT       [BLOCK] 'M12345678'
   · DRIVER_LICENSE [BLOCK] '11-19-123456-01'
 
@@ -125,8 +116,7 @@ RAW DETECTIONS (8):
   · DRIVER_LICENSE '11-19-123456-01'
 ❌ 미검출 FN (1):
   · ORGANIZATION   '네이버'
-⚠️  오탐 후보 FP (1):
-  · PERSON         '여권번호'
+⚠️  오탐 후보 FP (0):
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [05] 택배 분실 문의 (비표준 계좌 — 갭)
@@ -237,11 +227,9 @@ TEXT:
 GROUND TRUTH (5): PASSWORD=Adm1n!Temp2024, GCP_KEY=AIzaSyA1234567890abcdefghijklmnopqrstuvw, TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123ghiJKL, PERSON=신우진, PHONE=010-6060-7070
 TRAPS (탐지되면 오탐): v4.1.0, admin
 
-RAW DETECTIONS (7):
-  · PERSON         [TOKENIZE_ROUNDTRIP] 'admin'
+RAW DETECTIONS (5):
   · PASSWORD       [BLOCK] 'Adm1n!Temp2024'
   · GCP_KEY        [BLOCK] 'AIzaSyA1234567890abcdefghijklmnopqrstuv'
-  · PERSON         [TOKENIZE_ROUNDTRIP] 'JWT'
   · TOKEN          [BLOCK] 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123ghiJKL'
   · PERSON         [TOKENIZE_ROUNDTRIP] '신우진'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-6060-7070'
@@ -253,9 +241,7 @@ RAW DETECTIONS (7):
   · PERSON         '신우진'
   · PHONE          '010-6060-7070'
 ❌ 미검출 FN (0):
-⚠️  오탐 후보 FP (2):
-  · PERSON         'admin'  [TRAP-확정오탐]
-  · PERSON         'JWT'
+⚠️  오탐 후보 FP (0):
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [09] 은행 콜센터 스크립트 (한글 비번 라벨 — 갭)
@@ -388,10 +374,8 @@ TEXT:
 GROUND TRUTH (4): PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----, API_KEY=ghp_abcdEFGH1234567890ijklMNOP1234567890qZ, PERSON=한지민, PHONE=010-9999-8888
 TRAPS (탐지되면 오탐): release-2024.06.13, 1,200명
 
-RAW DETECTIONS (6):
-  · PERSON         [TOKENIZE_ROUNDTRIP] '프라이빗'
+RAW DETECTIONS (4):
   · PRIVATE_KEY    [BLOCK] '-----BEGIN RSA PRIVATE KEY-----'
-  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'MIIBOgIBAAJBAKj34GkxFh'
   · API_KEY        [BLOCK] 'ghp_abcdEFGH1234567890ijklMNOP1234567890qZ'
   · PERSON         [TOKENIZE_ROUNDTRIP] '한지민'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-9999-8888'
@@ -402,9 +386,7 @@ RAW DETECTIONS (6):
   · PERSON         '한지민'
   · PHONE          '010-9999-8888'
 ❌ 미검출 FN (0):
-⚠️  오탐 후보 FP (2):
-  · PERSON         '프라이빗'
-  · ORGANIZATION   'MIIBOgIBAAJBAKj34GkxFh'
+⚠️  오탐 후보 FP (0):
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [14] 학원 등록 상담
@@ -474,13 +456,12 @@ TEXT:
 GROUND TRUTH (6): PERSON=남도일, BIZ_NO=010-24-69680, KR_ACCOUNT=3333-01-1234567, EMAIL=doil.nam@gmail.com, PHONE=010-3636-4747, ADDRESS=서울 영등포구 여의대로 24
 TRAPS (탐지되면 오탐): 330만원, INV-0613
 
-RAW DETECTIONS (6):
+RAW DETECTIONS (5):
   · BIZ_NO         [TOKENIZE_ROUNDTRIP] '010-24-69680'
   · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '카카오뱅크'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'doil.nam@gmail.com'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-3636-4747'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 영등포구 여의대로 24'
-  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'NDA'
 
 ✅ 검출 TP (4):
   · BIZ_NO         '010-24-69680'
@@ -490,9 +471,8 @@ RAW DETECTIONS (6):
 ❌ 미검출 FN (2):
   · PERSON         '남도일'
   · KR_ACCOUNT     '3333-01-1234567'
-⚠️  오탐 후보 FP (2):
+⚠️  오탐 후보 FP (1):
   · ORGANIZATION   '카카오뱅크'
-  · ORGANIZATION   'NDA'
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [17] 보험 가입 설계
@@ -503,14 +483,13 @@ TEXT:
 GROUND TRUTH (8): PERSON=황민영, RRN=310124-2427977, PHONE=010-8282-9393, EMAIL=minyoung.hwang@nate.com, KR_ACCOUNT=1002-345-678901, ADDRESS=울산 남구 삼산로 100, PERSON=황지훈, CARD=4111-1111-1111-1111
 TRAPS (탐지되면 오탐): 12만원
 
-RAW DETECTIONS (9):
+RAW DETECTIONS (8):
   · PERSON         [TOKENIZE_ROUNDTRIP] '황민영'
   · RRN            [BLOCK] '310124-2427977'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-8282-9393'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'minyoung.hwang@nate.com'
   · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '1002-345-678901'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '울산 남구 삼산로 100'
-  · PERSON         [TOKENIZE_ROUNDTRIP] '수익자'
   · PERSON         [TOKENIZE_ROUNDTRIP] '황지훈'
   · CARD           [BLOCK] '4111-1111-1111-1111'
 
@@ -524,8 +503,7 @@ RAW DETECTIONS (9):
   · PERSON         '황지훈'
   · CARD           '4111-1111-1111-1111'
 ❌ 미검출 FN (0):
-⚠️  오탐 후보 FP (1):
-  · PERSON         '수익자'
+⚠️  오탐 후보 FP (0):
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [18] 코드 리뷰 코멘트 (코드+PII 혼합)
@@ -536,34 +514,21 @@ TEXT:
 GROUND TRUTH (5): API_KEY=sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV, EMAIL=customer.report@bizmail.com, PERSON=류현진, PHONE=010-1010-2020, PASSWORD=devpass2024!
 TRAPS (탐지되면 오탐): get_user_rrn(), ORD-2024-0613, config.py
 
-RAW DETECTIONS (11):
-  · PERSON         [TOKENIZE_ROUNDTRIP] 'API_KEY'
+RAW DETECTIONS (5):
   · API_KEY        [BLOCK] 'sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV'
-  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] "send_email(to='customer.report@bizmail.com"
-  · PERSON         [TOKENIZE_ROUNDTRIP] '주석'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'customer.report@bizmail.com'
   · PERSON         [TOKENIZE_ROUNDTRIP] '류현진'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-1010-2020'
-  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'DB_PASSWORD'
   · PASSWORD       [BLOCK] 'devpass2024!'
-  · PERSON         [TOKENIZE_ROUNDTRIP] '리턴값'
-  · PERSON         [TOKENIZE_ROUNDTRIP] '로깅'
-  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'LGTM'
 
-✅ 검출 TP (4):
+✅ 검출 TP (5):
   · API_KEY        'sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV'
+  · EMAIL          'customer.report@bizmail.com'
   · PERSON         '류현진'
   · PHONE          '010-1010-2020'
   · PASSWORD       'devpass2024!'
-❌ 미검출 FN (1):
-  · EMAIL          'customer.report@bizmail.com'
-⚠️  오탐 후보 FP (7):
-  · PERSON         'API_KEY'
-  · ORGANIZATION   "send_email(to='customer.report@bizmail.com"
-  · PERSON         '주석'
-  · ORGANIZATION   'DB_PASSWORD'
-  · PERSON         '리턴값'
-  · PERSON         '로깅'
-  · ORGANIZATION   'LGTM'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (0):
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [19] 동호회 회원 명부
@@ -609,7 +574,7 @@ TEXT:
 GROUND TRUTH (6): ORGANIZATION=한빛무역, BIZ_NO=887-13-78905, PERSON=오지환, PHONE=010-3434-5656, EMAIL=jihwan.oh@hanbit.co.kr, KR_ACCOUNT=123456-78-901234
 TRAPS (탐지되면 오탐): ABCU-1234567, 8517.12, USD 52,000
 
-RAW DETECTIONS (10):
+RAW DETECTIONS (9):
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '한빛무역'
   · BIZ_NO         [TOKENIZE_ROUNDTRIP] '887-13-78905'
   · PERSON         [TOKENIZE_ROUNDTRIP] '오지환'
@@ -619,7 +584,6 @@ RAW DETECTIONS (10):
   · PERSON         [TOKENIZE_ROUNDTRIP] 'Mike Brown'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '부산항'
   · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '123456-78-901234'
-  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'HS'
 
 ✅ 검출 TP (5):
   · BIZ_NO         '887-13-78905'
@@ -629,12 +593,11 @@ RAW DETECTIONS (10):
   · KR_ACCOUNT     '123456-78-901234'
 ❌ 미검출 FN (1):
   · ORGANIZATION   '한빛무역'
-⚠️  오탐 후보 FP (5):
+⚠️  오탐 후보 FP (4):
   · ADDRESS        '한빛무역'
   · ADDRESS        '미국'
   · PERSON         'Mike Brown'
   · ADDRESS        '부산항'
-  · ORGANIZATION   'HS'
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [21] 민원 접수 (관공서)
@@ -731,7 +694,7 @@ TEXT:
 GROUND TRUTH (5): ADDRESS=서울 구로구 경인로 662, PERSON=임수호, PHONE=010-4321-8765, KR_ACCOUNT=3333-02-7654321, EMAIL=sooho.lim@gmail.com
 TRAPS (탐지되면 오탐): 신도림역
 
-RAW DETECTIONS (8):
+RAW DETECTIONS (7):
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '신도림역'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 구로구 경인로 662'
   · PERSON         [TOKENIZE_ROUNDTRIP] '임수호'
@@ -739,7 +702,6 @@ RAW DETECTIONS (8):
   · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '카카오뱅크'
   · PHONE          [TOKENIZE_ROUNDTRIP] '02-7654321'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'sooho.lim@gmail.com'
-  · PERSON         [TOKENIZE_ROUNDTRIP] '네고'
 
 ✅ 검출 TP (4):
   · ADDRESS        '서울 구로구 경인로 662'
@@ -748,11 +710,10 @@ RAW DETECTIONS (8):
   · EMAIL          'sooho.lim@gmail.com'
 ❌ 미검출 FN (1):
   · KR_ACCOUNT     '3333-02-7654321'
-⚠️  오탐 후보 FP (4):
+⚠️  오탐 후보 FP (3):
   · ADDRESS        '신도림역'  [TRAP-확정오탐]
   · ORGANIZATION   '카카오뱅크'
   · PHONE          '02-7654321'
-  · PERSON         '네고'
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [25] 급여 명세 발송
@@ -882,12 +843,10 @@ TEXT:
 GROUND TRUTH (6): PERSON=노홍철, PHONE=010.3535.7979, KR_ACCOUNT=123-456-789012, BIZ_NO=1806341205, EMAIL=real.email@example.com, ADDRESS=서울특별시 중구 세종대로 110
 TRAPS (탐지되면 오탐): 02-555-1234, nono [at] example.com, 1111
 
-RAW DETECTIONS (7):
+RAW DETECTIONS (5):
   · PERSON         [TOKENIZE_ROUNDTRIP] '노홍철'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010.3535.7979'
   · PHONE          [TOKENIZE_ROUNDTRIP] '02-555-1234'
-  · PERSON         [TOKENIZE_ROUNDTRIP] '유선'
-  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'example.com'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'real.email@example.com'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울특별시 중구 세종대로 110'
 
@@ -899,10 +858,8 @@ RAW DETECTIONS (7):
 ❌ 미검출 FN (2):
   · KR_ACCOUNT     '123-456-789012'
   · BIZ_NO         '1806341205'
-⚠️  오탐 후보 FP (3):
+⚠️  오탐 후보 FP (1):
   · PHONE          '02-555-1234'  [TRAP-확정오탐]
-  · PERSON         '유선'
-  · ORGANIZATION   'example.com'  [TRAP-확정오탐]
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [30] 복합 업무 메일 (총정리)
@@ -944,9 +901,9 @@ RAW DETECTIONS (11):
 집계
 ==========================================================================================
 케이스: 30 · ground truth 항목: 204
-검출 TP: 185 · 미검출 FN: 19 · 오탐 FP: 49
-재현율(Recall) = TP/(TP+FN) = 185/204 = 0.907
-정밀도(Precision) = TP/(TP+FP) = 185/234 = 0.791
+검출 TP: 186 · 미검출 FN: 18 · 오탐 FP: 27
+재현율(Recall) = TP/(TP+FN) = 186/204 = 0.912
+정밀도(Precision) = TP/(TP+FP) = 186/213 = 0.873
 
 카테고리별:
   category           TP   FN   recall
@@ -956,7 +913,7 @@ RAW DETECTIONS (11):
   BIZ_NO              6    1     0.86
   CARD                6    0     1.00
   DRIVER_LICENSE      3    0     1.00
-  EMAIL              25    1     0.96
+  EMAIL              26    0     1.00
   FOREIGN_REG         1    0     1.00
   GCP_KEY             1    0     1.00
   KR_ACCOUNT         14    4     0.78

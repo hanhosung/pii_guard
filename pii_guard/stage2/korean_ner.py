@@ -68,6 +68,7 @@ from ..models import (
     DetectionStage,
     MaskStyle,
 )
+from .ner_filters import is_ner_false_positive
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +253,10 @@ class KoreanNEREngine:
 
         # Sort by start position
         detections.sort(key=lambda d: d.start)
-        return detections
+        # Negative-proximity suppression: drop NER false positives (code tokens,
+        # acronyms, blobs, common nouns) — recall-safe, precision-raising.
+        return [d for d in detections
+                if not is_ner_false_positive(d.category, d.original)]
 
     # ── Private helpers ───────────────────────────────────────────────────────
 

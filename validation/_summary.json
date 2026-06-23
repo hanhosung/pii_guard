@@ -1,11 +1,11 @@
 {
   "n_cases": 30,
   "total_exp": 204,
-  "total_tp": 185,
-  "total_fn": 19,
-  "fp_total": 49,
-  "recall": 0.9068627450980392,
-  "precision": 0.7905982905982906,
+  "total_tp": 186,
+  "total_fn": 18,
+  "fp_total": 27,
+  "recall": 0.9117647058823529,
+  "precision": 0.8732394366197183,
   "per_cat": {
     "PERSON": {
       "tp": 38,
@@ -16,8 +16,8 @@
       "fn": 1
     },
     "EMAIL": {
-      "tp": 25,
-      "fn": 1
+      "tp": 26,
+      "fn": 0
     },
     "RRN": {
       "tp": 9,
@@ -211,21 +211,10 @@
       "n_expected": 5,
       "tp": 5,
       "fn": 0,
-      "fp": 2,
+      "fp": 0,
       "fn_items": [],
-      "fp_items": [
-        [
-          "ORGANIZATION",
-          "AWS",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "rotate",
-          "TOKENIZE_ROUNDTRIP"
-        ]
-      ],
-      "n_det": 7,
+      "fp_items": [],
+      "n_det": 5,
       "has_block": true,
       "text": "@here 긴급합니다. 방금 스테이징 배포하다가 실수로 환경변수를 로그에 찍어버렸어요. AWS 키 AKIAIOSFODNN7EXAMPLE 랑 시크릿이 그대로 노출됐고, OpenAI 키도 sk-abcdefghijklmnopqrstuvwxyz1234567890 이게 커밋에 들어갔습니다. 깃헙 토큰 ghp_1234567890abcdefghijklmnopqrstuvwxyz12 도 같이요. 일단 전부 무효화(rotate) 하겠습니다. DB 접속 비번도 password=Sup3rSecret!2024 로 평문이라 바꿔야 해요. 관련 PR은 #1423, 빌드 버전은 v2.3.1 입니다. 인프라팀 박지훈 님께 공유 부탁드려요. 사내 위키 https://wiki.internal/runbook 참고하세요.",
       "expected": [
@@ -256,11 +245,6 @@
       ],
       "detections": [
         [
-          "ORGANIZATION",
-          "AWS",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
           "AWS_SECRET",
           "AKIAIOSFODNN7EXAMPLE",
           "BLOCK"
@@ -274,11 +258,6 @@
           "API_KEY",
           "ghp_1234567890abcdefghijklmnopqrstuvwxyz12",
           "BLOCK"
-        ],
-        [
-          "ORGANIZATION",
-          "rotate",
-          "TOKENIZE_ROUNDTRIP"
         ],
         [
           "PASSWORD",
@@ -320,21 +299,10 @@
       "n_expected": 7,
       "tp": 7,
       "fn": 0,
-      "fp": 2,
+      "fp": 0,
       "fn_items": [],
-      "fp_items": [
-        [
-          "ADDRESS",
-          "생년월일",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "문진표",
-          "TOKENIZE_ROUNDTRIP"
-        ]
-      ],
-      "n_det": 9,
+      "fp_items": [],
+      "n_det": 7,
       "has_block": true,
       "text": "안녕하세요, 환자분. 내일 진료 예약 확인차 연락드립니다. 성함 이도현, 생년월일 1988-03-12, 연락처 010-7788-9900 으로 등록되어 있습니다. 접수 시 주민번호 770123-4279267 필요합니다. 초진 문진표는 dohyun.lee@daum.net 으로 발송했으니 작성 부탁드립니다. 병원 위치는 서울 송파구 올림픽로 300 메디컬타워 5층이며, 주차 등록 차량은 12가 3456 입니다. 수납은 카드 5500-0055-5555-5559 또는 현금 가능합니다. 진료과는 정형외과, 담당의는 최민호 과장입니다.",
       "expected": [
@@ -378,11 +346,6 @@
           "TOKENIZE_ROUNDTRIP"
         ],
         [
-          "ADDRESS",
-          "생년월일",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
           "PHONE",
           "010-7788-9900",
           "TOKENIZE_ROUNDTRIP"
@@ -391,11 +354,6 @@
           "RRN",
           "770123-4279267",
           "BLOCK"
-        ],
-        [
-          "PERSON",
-          "문진표",
-          "TOKENIZE_ROUNDTRIP"
         ],
         [
           "EMAIL",
@@ -455,21 +413,15 @@
       "n_expected": 8,
       "tp": 7,
       "fn": 1,
-      "fp": 1,
+      "fp": 0,
       "fn_items": [
         [
           "ORGANIZATION",
           "네이버"
         ]
       ],
-      "fp_items": [
-        [
-          "PERSON",
-          "여권번호",
-          "TOKENIZE_ROUNDTRIP"
-        ]
-      ],
-      "n_det": 8,
+      "fp_items": [],
+      "n_det": 7,
       "has_block": true,
       "text": "지원자 정보 정리합니다. 이름 강하늘, 휴대폰 010-2233-4455, 이메일 haneul.kang@kakao.com. 현 주소는 경기도 성남시 분당구 판교역로 235 이고, 전 직장은 네이버였습니다. 포트폴리오는 깃헙 https://github.com/haneulk 에 있고, 비상연락망으로 부친 010-9001-2002 도 받았습니다. 여권번호 M12345678 (해외 출장 이력 확인용), 운전면허 11-19-123456-01 소지. 희망 연봉은 6,500만원, 입사 가능일 7월 1일. 학력은 2015년 졸업입니다.",
       "expected": [
@@ -534,11 +486,6 @@
         [
           "PHONE",
           "010-9001-2002",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "여권번호",
           "TOKENIZE_ROUNDTRIP"
         ],
         [
@@ -1004,21 +951,10 @@
       "n_expected": 5,
       "tp": 5,
       "fn": 0,
-      "fp": 2,
+      "fp": 0,
       "fn_items": [],
-      "fp_items": [
-        [
-          "PERSON",
-          "admin",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "JWT",
-          "TOKENIZE_ROUNDTRIP"
-        ]
-      ],
-      "n_det": 7,
+      "fp_items": [],
+      "n_det": 5,
       "has_block": true,
       "text": "[시스템 로그 첨부] 운영 서버 점검 결과입니다. 관리자 계정 admin 의 임시 비밀번호는 password=Adm1n!Temp2024 로 설정되어 있었고, 즉시 변경 권고합니다. 서비스 계정 키 AIzaSyA1234567890abcdefghijklmnopqrstuvw 가 코드에 하드코딩되어 있습니다. JWT 세션 토큰 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123ghiJKL 도 로그에 남아 있었습니다. 점검 담당자 신우진 책임, 내선 010-6060-7070. 다음 점검은 분기말. 영향받는 서비스는 결제 모듈 v4.1.0 입니다.",
       "expected": [
@@ -1049,11 +985,6 @@
       ],
       "detections": [
         [
-          "PERSON",
-          "admin",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
           "PASSWORD",
           "Adm1n!Temp2024",
           "BLOCK"
@@ -1062,11 +993,6 @@
           "GCP_KEY",
           "AIzaSyA1234567890abcdefghijklmnopqrstuv",
           "BLOCK"
-        ],
-        [
-          "PERSON",
-          "JWT",
-          "TOKENIZE_ROUNDTRIP"
         ],
         [
           "TOKEN",
@@ -1577,21 +1503,10 @@
       "n_expected": 4,
       "tp": 4,
       "fn": 0,
-      "fp": 2,
+      "fp": 0,
       "fn_items": [],
-      "fp_items": [
-        [
-          "PERSON",
-          "프라이빗",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "MIIBOgIBAAJBAKj34GkxFh",
-          "TOKENIZE_ROUNDTRIP"
-        ]
-      ],
-      "n_det": 6,
+      "fp_items": [],
+      "n_det": 4,
       "has_block": true,
       "text": "장애 보고: 02시 14분 결제 API 오류 급증. 원인은 만료된 인증서와 유출된 자격증명입니다. 유출된 프라이빗 키 일부:\n-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFh\n-----END RSA PRIVATE KEY-----\n그리고 슬랙 웹훅에 박힌 토큰 ghp_abcdEFGH1234567890ijklMNOP1234567890qZ 발견. 대응 담당 한지민, 비상 연락 010-9999-8888. 영향받은 고객 약 1,200명. 롤백 버전은 release-2024.06.13. 사후 분석 회의는 내일 10시입니다.",
       "expected": [
@@ -1618,19 +1533,9 @@
       ],
       "detections": [
         [
-          "PERSON",
-          "프라이빗",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
           "PRIVATE_KEY",
           "-----BEGIN RSA PRIVATE KEY-----",
           "BLOCK"
-        ],
-        [
-          "ORGANIZATION",
-          "MIIBOgIBAAJBAKj34GkxFh",
-          "TOKENIZE_ROUNDTRIP"
         ],
         [
           "API_KEY",
@@ -1912,7 +1817,7 @@
       "n_expected": 6,
       "tp": 4,
       "fn": 2,
-      "fp": 2,
+      "fp": 1,
       "fn_items": [
         [
           "PERSON",
@@ -1928,14 +1833,9 @@
           "ORGANIZATION",
           "카카오뱅크",
           "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "NDA",
-          "TOKENIZE_ROUNDTRIP"
         ]
       ],
-      "n_det": 6,
+      "n_det": 5,
       "has_block": false,
       "text": "6월 외주 정산 안내드립니다. 작업자 성함 남도일, 사업자등록번호 010-24-69680 (간이과세). 정산 금액 330만원, 입금 계좌는 카카오뱅크 3333-01-1234567 입니다. 세금계산서 발행 위해 이메일 doil.nam@gmail.com 확인 부탁드려요. 연락처 010-3636-4747. 계약서상 주소는 서울 영등포구 여의대로 24. 다음 프로젝트는 8월 시작 예정이며, NDA 서명본은 별도 보관합니다. 인보이스 번호 INV-0613.",
       "expected": [
@@ -1993,11 +1893,6 @@
           "ADDRESS",
           "서울 영등포구 여의대로 24",
           "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "NDA",
-          "TOKENIZE_ROUNDTRIP"
         ]
       ],
       "tp_items": [
@@ -2025,16 +1920,10 @@
       "n_expected": 8,
       "tp": 8,
       "fn": 0,
-      "fp": 1,
+      "fp": 0,
       "fn_items": [],
-      "fp_items": [
-        [
-          "PERSON",
-          "수익자",
-          "TOKENIZE_ROUNDTRIP"
-        ]
-      ],
-      "n_det": 9,
+      "fp_items": [],
+      "n_det": 8,
       "has_block": true,
       "text": "종신보험 설계 내역입니다. 피보험자 황민영, 주민번호 310124-2427977. 월 납입액 12만원, 가입자 연락처 010-8282-9393, 이메일 minyoung.hwang@nate.com. 자동이체 계좌 우리 1002-345-678901 등록 예정. 주소는 울산 남구 삼산로 100. 수익자는 배우자 황지훈으로 지정. 청약 카드 4111-1111-1111-1111 로 첫 회 결제. 보장 개시일은 익월 1일입니다. 증권번호는 발급 후 안내드립니다.",
       "expected": [
@@ -2107,11 +1996,6 @@
         ],
         [
           "PERSON",
-          "수익자",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
           "황지훈",
           "TOKENIZE_ROUNDTRIP"
         ],
@@ -2160,53 +2044,12 @@
       "id": 18,
       "title": "코드 리뷰 코멘트 (코드+PII 혼합)",
       "n_expected": 5,
-      "tp": 4,
-      "fn": 1,
-      "fp": 7,
-      "fn_items": [
-        [
-          "EMAIL",
-          "customer.report@bizmail.com"
-        ]
-      ],
-      "fp_items": [
-        [
-          "PERSON",
-          "API_KEY",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "send_email(to='customer.report@bizmail.com",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "주석",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "DB_PASSWORD",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "리턴값",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "로깅",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "LGTM",
-          "TOKENIZE_ROUNDTRIP"
-        ]
-      ],
-      "n_det": 11,
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "fn_items": [],
+      "fp_items": [],
+      "n_det": 5,
       "has_block": true,
       "text": "리뷰 남깁니다. config.py 에 테스트용 자격증명이 그대로 있네요. API_KEY = 'sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV' 이건 .env 로 빼주세요. 그리고 send_email(to='customer.report@bizmail.com') 호출에서 실제 고객 메일이 하드코딩됐어요. 주석에 '담당: 류현진 010-1010-2020' 도 지워주시고요. DB_PASSWORD=devpass2024! 도 위험합니다. 함수명 get_user_rrn() 는 괜찮은데 리턴값 로깅은 빼주세요. 변수 order_id=ORD-2024-0613 는 유지. 전반적으로 LGTM, 위 5개만 수정 부탁해요.",
       "expected": [
@@ -2238,23 +2081,13 @@
       ],
       "detections": [
         [
-          "PERSON",
-          "API_KEY",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
           "API_KEY",
           "sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV",
           "BLOCK"
         ],
         [
-          "ORGANIZATION",
-          "send_email(to='customer.report@bizmail.com",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "주석",
+          "EMAIL",
+          "customer.report@bizmail.com",
           "TOKENIZE_ROUNDTRIP"
         ],
         [
@@ -2268,35 +2101,19 @@
           "TOKENIZE_ROUNDTRIP"
         ],
         [
-          "ORGANIZATION",
-          "DB_PASSWORD",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
           "PASSWORD",
           "devpass2024!",
           "BLOCK"
-        ],
-        [
-          "PERSON",
-          "리턴값",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "로깅",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "LGTM",
-          "TOKENIZE_ROUNDTRIP"
         ]
       ],
       "tp_items": [
         [
           "API_KEY",
           "sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV"
+        ],
+        [
+          "EMAIL",
+          "customer.report@bizmail.com"
         ],
         [
           "PERSON",
@@ -2475,7 +2292,7 @@
       "n_expected": 6,
       "tp": 5,
       "fn": 1,
-      "fp": 5,
+      "fp": 4,
       "fn_items": [
         [
           "ORGANIZATION",
@@ -2502,14 +2319,9 @@
           "ADDRESS",
           "부산항",
           "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "HS",
-          "TOKENIZE_ROUNDTRIP"
         ]
       ],
-      "n_det": 10,
+      "n_det": 9,
       "has_block": false,
       "text": "수출 신고 건 정리합니다. 수출자 상호 한빛무역, 사업자등록번호 887-13-78905. 담당자 오지환, 연락처 010-3434-5656, 이메일 jihwan.oh@hanbit.co.kr. 수입자는 미국 바이어 Mike Brown. 선적 항구는 부산항. 결제 조건 T/T, 대금 수취 계좌 외환 123456-78-901234. 컨테이너 번호 ABCU-1234567. 인보이스 금액 USD 52,000. HS 코드는 8517.12 입니다. 통관 예정일 6월 18일.",
       "expected": [
@@ -2587,11 +2399,6 @@
         [
           "KR_ACCOUNT",
           "123456-78-901234",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "HS",
           "TOKENIZE_ROUNDTRIP"
         ]
       ],
@@ -2956,7 +2763,7 @@
       "n_expected": 5,
       "tp": 4,
       "fn": 1,
-      "fp": 4,
+      "fp": 3,
       "fn_items": [
         [
           "KR_ACCOUNT",
@@ -2978,14 +2785,9 @@
           "PHONE",
           "02-7654321",
           "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "네고",
-          "TOKENIZE_ROUNDTRIP"
         ]
       ],
-      "n_det": 8,
+      "n_det": 7,
       "has_block": false,
       "text": "안녕하세요 아이폰 판매글 보고 연락드려요. 직거래 가능하실까요? 저는 신도림역 근처 살아요. 혹시 안 되면 택배도 괜찮아요. 받는 주소 알려드릴게요. 서울 구로구 경인로 662, 받는사람 임수호, 연락처 010-4321-8765 입니다. 입금은 카카오뱅크 3333-02-7654321 로 할게요. 이메일은 sooho.lim@gmail.com. 혹시 영수증 필요하면 말씀해주세요. 네고는 살짝만 부탁드려요. 물건 상태 좋아 보이네요. 내일 오후에 거래 가능합니다.",
       "expected": [
@@ -3047,11 +2849,6 @@
         [
           "EMAIL",
           "sooho.lim@gmail.com",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "네고",
           "TOKENIZE_ROUNDTRIP"
         ]
       ],
@@ -3556,7 +3353,7 @@
       "n_expected": 6,
       "tp": 4,
       "fn": 2,
-      "fp": 3,
+      "fp": 1,
       "fn_items": [
         [
           "KR_ACCOUNT",
@@ -3572,19 +3369,9 @@
           "PHONE",
           "02-555-1234",
           "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "유선",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "example.com",
-          "TOKENIZE_ROUNDTRIP"
         ]
       ],
-      "n_det": 7,
+      "n_det": 5,
       "has_block": false,
       "text": "정보 정리: 담당자 노홍철(연락 010.3535.7979 — 점으로 구분). 백업 연락처는 02-555-1234 유선. 계좌는 우리 123-456-789012 (자주 쓰는 거). 사업자번호 1806341205 (하이픈 없이). 이메일 두 개: nono [at] example.com 과 real.email@example.com. 비밀번호는 그냥 '가나다1234!' 로 해놨어. 주소는 서울특별시 중구 세종대로 110. 카드 뒷자리만: 1111. 끝.",
       "expected": [
@@ -3632,16 +3419,6 @@
         [
           "PHONE",
           "02-555-1234",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PERSON",
-          "유선",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "ORGANIZATION",
-          "example.com",
           "TOKENIZE_ROUNDTRIP"
         ],
         [
