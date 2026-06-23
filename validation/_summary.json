@@ -1,11 +1,11 @@
 {
   "n_cases": 30,
   "total_exp": 204,
-  "total_tp": 186,
-  "total_fn": 18,
-  "fp_total": 27,
-  "recall": 0.9117647058823529,
-  "precision": 0.8732394366197183,
+  "total_tp": 192,
+  "total_fn": 12,
+  "fp_total": 26,
+  "recall": 0.9411764705882353,
+  "precision": 0.8807339449541285,
   "per_cat": {
     "PERSON": {
       "tp": 38,
@@ -28,8 +28,8 @@
       "fn": 2
     },
     "KR_ACCOUNT": {
-      "tp": 14,
-      "fn": 4
+      "tp": 18,
+      "fn": 0
     },
     "CARD": {
       "tp": 6,
@@ -44,8 +44,8 @@
       "fn": 0
     },
     "PASSWORD": {
-      "tp": 4,
-      "fn": 1
+      "tp": 5,
+      "fn": 0
     },
     "ORGANIZATION": {
       "tp": 8,
@@ -60,8 +60,8 @@
       "fn": 0
     },
     "BIZ_NO": {
-      "tp": 6,
-      "fn": 1
+      "tp": 7,
+      "fn": 0
     },
     "FOREIGN_REG": {
       "tp": 1,
@@ -534,15 +534,10 @@
       "id": 5,
       "title": "택배 분실 문의 (비표준 계좌 — 갭)",
       "n_expected": 7,
-      "tp": 6,
-      "fn": 1,
+      "tp": 7,
+      "fn": 0,
       "fp": 2,
-      "fn_items": [
-        [
-          "KR_ACCOUNT",
-          "123-456-789012"
-        ]
-      ],
+      "fn_items": [],
       "fp_items": [
         [
           "ORGANIZATION",
@@ -555,7 +550,7 @@
           "BLOCK"
         ]
       ],
-      "n_det": 8,
+      "n_det": 9,
       "has_block": true,
       "text": "배송 못 받아서 문의드려요. 받는 사람 윤지우, 전화 010-5566-7788 입니다. 주소는 인천 연수구 송도과학로 32 아파트 105동 1203호예요. 보상은 신한은행 계좌로 받을게요, 계좌번호는 110-123456-78901 입니다. 혹시 안 되면 다른 계좌 123-456-789012 로 부탁해요. 구매할 때 적은 이메일은 jiwoo.yoon@naver.com 이고요. 운송장 번호는 123456789012 입니다. 빠른 처리 부탁드립니다. 사업자등록번호 180-63-41205 로 세금계산서도 필요해요.",
       "expected": [
@@ -618,6 +613,11 @@
           "TOKENIZE_ROUNDTRIP"
         ],
         [
+          "KR_ACCOUNT",
+          "123-456-789012",
+          "TOKENIZE_ROUNDTRIP"
+        ],
+        [
           "EMAIL",
           "jiwoo.yoon@naver.com",
           "TOKENIZE_ROUNDTRIP"
@@ -649,6 +649,10 @@
         [
           "KR_ACCOUNT",
           "110-123456-78901"
+        ],
+        [
+          "KR_ACCOUNT",
+          "123-456-789012"
         ],
         [
           "EMAIL",
@@ -1037,17 +1041,12 @@
       "id": 9,
       "title": "은행 콜센터 스크립트 (한글 비번 라벨 — 갭)",
       "n_expected": 7,
-      "tp": 6,
-      "fn": 1,
+      "tp": 7,
+      "fn": 0,
       "fp": 0,
-      "fn_items": [
-        [
-          "PASSWORD",
-          "SecurePw99"
-        ]
-      ],
+      "fn_items": [],
       "fp_items": [],
-      "n_det": 6,
+      "n_det": 7,
       "has_block": true,
       "text": "고객님 본인확인 진행하겠습니다. 성함 배수지 고객님 맞으신가요? 등록된 전화 010-7070-8080 마지막 네 자리 확인됐습니다. 인터넷뱅킹 비밀번호: SecurePw99 라고 메모에 적혀 있는데 보안상 폐기하겠습니다. 주민등록번호 010809-2201058 확인 완료했고요. 자택 주소는 대전 유성구 대학로 99 입니다. 출금 계좌 신한 110-123456-78901, 이메일 suji.bae@hanmail.net. 최근 거래 내역은 앱에서 확인 가능합니다. 상담사 번호는 1588-0000 입니다.",
       "expected": [
@@ -1095,6 +1094,11 @@
           "TOKENIZE_ROUNDTRIP"
         ],
         [
+          "PASSWORD",
+          "SecurePw99",
+          "BLOCK"
+        ],
+        [
           "RRN",
           "010809-2201058",
           "BLOCK"
@@ -1123,6 +1127,10 @@
         [
           "PHONE",
           "010-7070-8080"
+        ],
+        [
+          "PASSWORD",
+          "SecurePw99"
         ],
         [
           "RRN",
@@ -1815,17 +1823,13 @@
       "id": 16,
       "title": "프리랜서 계약/정산",
       "n_expected": 6,
-      "tp": 4,
-      "fn": 2,
+      "tp": 5,
+      "fn": 1,
       "fp": 1,
       "fn_items": [
         [
           "PERSON",
           "남도일"
-        ],
-        [
-          "KR_ACCOUNT",
-          "3333-01-1234567"
         ]
       ],
       "fp_items": [
@@ -1835,7 +1839,7 @@
           "TOKENIZE_ROUNDTRIP"
         ]
       ],
-      "n_det": 5,
+      "n_det": 6,
       "has_block": false,
       "text": "6월 외주 정산 안내드립니다. 작업자 성함 남도일, 사업자등록번호 010-24-69680 (간이과세). 정산 금액 330만원, 입금 계좌는 카카오뱅크 3333-01-1234567 입니다. 세금계산서 발행 위해 이메일 doil.nam@gmail.com 확인 부탁드려요. 연락처 010-3636-4747. 계약서상 주소는 서울 영등포구 여의대로 24. 다음 프로젝트는 8월 시작 예정이며, NDA 서명본은 별도 보관합니다. 인보이스 번호 INV-0613.",
       "expected": [
@@ -1880,6 +1884,11 @@
           "TOKENIZE_ROUNDTRIP"
         ],
         [
+          "KR_ACCOUNT",
+          "3333-01-1234567",
+          "TOKENIZE_ROUNDTRIP"
+        ],
+        [
           "EMAIL",
           "doil.nam@gmail.com",
           "TOKENIZE_ROUNDTRIP"
@@ -1899,6 +1908,10 @@
         [
           "BIZ_NO",
           "010-24-69680"
+        ],
+        [
+          "KR_ACCOUNT",
+          "3333-01-1234567"
         ],
         [
           "EMAIL",
@@ -2761,15 +2774,10 @@
       "id": 24,
       "title": "중고거래 채팅",
       "n_expected": 5,
-      "tp": 4,
-      "fn": 1,
-      "fp": 3,
-      "fn_items": [
-        [
-          "KR_ACCOUNT",
-          "3333-02-7654321"
-        ]
-      ],
+      "tp": 5,
+      "fn": 0,
+      "fp": 2,
+      "fn_items": [],
       "fp_items": [
         [
           "ADDRESS",
@@ -2779,11 +2787,6 @@
         [
           "ORGANIZATION",
           "카카오뱅크",
-          "TOKENIZE_ROUNDTRIP"
-        ],
-        [
-          "PHONE",
-          "02-7654321",
           "TOKENIZE_ROUNDTRIP"
         ]
       ],
@@ -2842,8 +2845,8 @@
           "TOKENIZE_ROUNDTRIP"
         ],
         [
-          "PHONE",
-          "02-7654321",
+          "KR_ACCOUNT",
+          "3333-02-7654321",
           "TOKENIZE_ROUNDTRIP"
         ],
         [
@@ -2864,6 +2867,10 @@
         [
           "PHONE",
           "010-4321-8765"
+        ],
+        [
+          "KR_ACCOUNT",
+          "3333-02-7654321"
         ],
         [
           "EMAIL",
@@ -3351,19 +3358,10 @@
       "id": 29,
       "title": "비표준 포맷 집중 (약점 노출)",
       "n_expected": 6,
-      "tp": 4,
-      "fn": 2,
+      "tp": 6,
+      "fn": 0,
       "fp": 1,
-      "fn_items": [
-        [
-          "KR_ACCOUNT",
-          "123-456-789012"
-        ],
-        [
-          "BIZ_NO",
-          "1806341205"
-        ]
-      ],
+      "fn_items": [],
       "fp_items": [
         [
           "PHONE",
@@ -3371,7 +3369,7 @@
           "TOKENIZE_ROUNDTRIP"
         ]
       ],
-      "n_det": 5,
+      "n_det": 7,
       "has_block": false,
       "text": "정보 정리: 담당자 노홍철(연락 010.3535.7979 — 점으로 구분). 백업 연락처는 02-555-1234 유선. 계좌는 우리 123-456-789012 (자주 쓰는 거). 사업자번호 1806341205 (하이픈 없이). 이메일 두 개: nono [at] example.com 과 real.email@example.com. 비밀번호는 그냥 '가나다1234!' 로 해놨어. 주소는 서울특별시 중구 세종대로 110. 카드 뒷자리만: 1111. 끝.",
       "expected": [
@@ -3422,6 +3420,16 @@
           "TOKENIZE_ROUNDTRIP"
         ],
         [
+          "KR_ACCOUNT",
+          "123-456-789012",
+          "TOKENIZE_ROUNDTRIP"
+        ],
+        [
+          "BIZ_NO",
+          "1806341205",
+          "TOKENIZE_ROUNDTRIP"
+        ],
+        [
           "EMAIL",
           "real.email@example.com",
           "TOKENIZE_ROUNDTRIP"
@@ -3440,6 +3448,14 @@
         [
           "PHONE",
           "010.3535.7979"
+        ],
+        [
+          "KR_ACCOUNT",
+          "123-456-789012"
+        ],
+        [
+          "BIZ_NO",
+          "1806341205"
         ],
         [
           "EMAIL",

@@ -127,25 +127,26 @@ TEXT:
 GROUND TRUTH (7): PERSON=윤지우, PHONE=010-5566-7788, ADDRESS=인천 연수구 송도과학로 32, KR_ACCOUNT=110-123456-78901, KR_ACCOUNT=123-456-789012, EMAIL=jiwoo.yoon@naver.com, BIZ_NO=180-63-41205
 TRAPS (탐지되면 오탐): 123456789012
 
-RAW DETECTIONS (8):
+RAW DETECTIONS (9):
   · PERSON         [TOKENIZE_ROUNDTRIP] '윤지우'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-5566-7788'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '인천 연수구 송도과학로 32 아파트 105동 1203'
   · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '신한은행'
   · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '110-123456-78901'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '123-456-789012'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'jiwoo.yoon@naver.com'
   · DRIVER_LICENSE [BLOCK] '123456789012'
   · BIZ_NO         [TOKENIZE_ROUNDTRIP] '180-63-41205'
 
-✅ 검출 TP (6):
+✅ 검출 TP (7):
   · PERSON         '윤지우'
   · PHONE          '010-5566-7788'
   · ADDRESS        '인천 연수구 송도과학로 32'
   · KR_ACCOUNT     '110-123456-78901'
+  · KR_ACCOUNT     '123-456-789012'
   · EMAIL          'jiwoo.yoon@naver.com'
   · BIZ_NO         '180-63-41205'
-❌ 미검출 FN (1):
-  · KR_ACCOUNT     '123-456-789012'
+❌ 미검출 FN (0):
 ⚠️  오탐 후보 FP (2):
   · ORGANIZATION   '신한은행'
   · DRIVER_LICENSE '123456789012'  [TRAP-확정오탐]
@@ -252,23 +253,24 @@ TEXT:
 GROUND TRUTH (7): PERSON=배수지, PHONE=010-7070-8080, PASSWORD=SecurePw99, RRN=010809-2201058, ADDRESS=대전 유성구 대학로 99, KR_ACCOUNT=110-123456-78901, EMAIL=suji.bae@hanmail.net
 TRAPS (탐지되면 오탐): 1588-0000
 
-RAW DETECTIONS (6):
+RAW DETECTIONS (7):
   · PERSON         [TOKENIZE_ROUNDTRIP] '배수지'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-7070-8080'
+  · PASSWORD       [BLOCK] 'SecurePw99'
   · RRN            [BLOCK] '010809-2201058'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '대전 유성구 대학로 99'
   · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '110-123456-78901'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'suji.bae@hanmail.net'
 
-✅ 검출 TP (6):
+✅ 검출 TP (7):
   · PERSON         '배수지'
   · PHONE          '010-7070-8080'
+  · PASSWORD       'SecurePw99'
   · RRN            '010809-2201058'
   · ADDRESS        '대전 유성구 대학로 99'
   · KR_ACCOUNT     '110-123456-78901'
   · EMAIL          'suji.bae@hanmail.net'
-❌ 미검출 FN (1):
-  · PASSWORD       'SecurePw99'
+❌ 미검출 FN (0):
 ⚠️  오탐 후보 FP (0):
 
 ──────────────────────────────────────────────────────────────────────────────────────────
@@ -456,21 +458,22 @@ TEXT:
 GROUND TRUTH (6): PERSON=남도일, BIZ_NO=010-24-69680, KR_ACCOUNT=3333-01-1234567, EMAIL=doil.nam@gmail.com, PHONE=010-3636-4747, ADDRESS=서울 영등포구 여의대로 24
 TRAPS (탐지되면 오탐): 330만원, INV-0613
 
-RAW DETECTIONS (5):
+RAW DETECTIONS (6):
   · BIZ_NO         [TOKENIZE_ROUNDTRIP] '010-24-69680'
   · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '카카오뱅크'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '3333-01-1234567'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'doil.nam@gmail.com'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-3636-4747'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 영등포구 여의대로 24'
 
-✅ 검출 TP (4):
+✅ 검출 TP (5):
   · BIZ_NO         '010-24-69680'
+  · KR_ACCOUNT     '3333-01-1234567'
   · EMAIL          'doil.nam@gmail.com'
   · PHONE          '010-3636-4747'
   · ADDRESS        '서울 영등포구 여의대로 24'
-❌ 미검출 FN (2):
+❌ 미검출 FN (1):
   · PERSON         '남도일'
-  · KR_ACCOUNT     '3333-01-1234567'
 ⚠️  오탐 후보 FP (1):
   · ORGANIZATION   '카카오뱅크'
 
@@ -700,20 +703,19 @@ RAW DETECTIONS (7):
   · PERSON         [TOKENIZE_ROUNDTRIP] '임수호'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010-4321-8765'
   · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '카카오뱅크'
-  · PHONE          [TOKENIZE_ROUNDTRIP] '02-7654321'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '3333-02-7654321'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'sooho.lim@gmail.com'
 
-✅ 검출 TP (4):
+✅ 검출 TP (5):
   · ADDRESS        '서울 구로구 경인로 662'
   · PERSON         '임수호'
   · PHONE          '010-4321-8765'
-  · EMAIL          'sooho.lim@gmail.com'
-❌ 미검출 FN (1):
   · KR_ACCOUNT     '3333-02-7654321'
-⚠️  오탐 후보 FP (3):
+  · EMAIL          'sooho.lim@gmail.com'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (2):
   · ADDRESS        '신도림역'  [TRAP-확정오탐]
   · ORGANIZATION   '카카오뱅크'
-  · PHONE          '02-7654321'
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [25] 급여 명세 발송
@@ -843,21 +845,23 @@ TEXT:
 GROUND TRUTH (6): PERSON=노홍철, PHONE=010.3535.7979, KR_ACCOUNT=123-456-789012, BIZ_NO=1806341205, EMAIL=real.email@example.com, ADDRESS=서울특별시 중구 세종대로 110
 TRAPS (탐지되면 오탐): 02-555-1234, nono [at] example.com, 1111
 
-RAW DETECTIONS (5):
+RAW DETECTIONS (7):
   · PERSON         [TOKENIZE_ROUNDTRIP] '노홍철'
   · PHONE          [TOKENIZE_ROUNDTRIP] '010.3535.7979'
   · PHONE          [TOKENIZE_ROUNDTRIP] '02-555-1234'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '123-456-789012'
+  · BIZ_NO         [TOKENIZE_ROUNDTRIP] '1806341205'
   · EMAIL          [TOKENIZE_ROUNDTRIP] 'real.email@example.com'
   · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울특별시 중구 세종대로 110'
 
-✅ 검출 TP (4):
+✅ 검출 TP (6):
   · PERSON         '노홍철'
   · PHONE          '010.3535.7979'
-  · EMAIL          'real.email@example.com'
-  · ADDRESS        '서울특별시 중구 세종대로 110'
-❌ 미검출 FN (2):
   · KR_ACCOUNT     '123-456-789012'
   · BIZ_NO         '1806341205'
+  · EMAIL          'real.email@example.com'
+  · ADDRESS        '서울특별시 중구 세종대로 110'
+❌ 미검출 FN (0):
 ⚠️  오탐 후보 FP (1):
   · PHONE          '02-555-1234'  [TRAP-확정오탐]
 
@@ -901,25 +905,25 @@ RAW DETECTIONS (11):
 집계
 ==========================================================================================
 케이스: 30 · ground truth 항목: 204
-검출 TP: 186 · 미검출 FN: 18 · 오탐 FP: 27
-재현율(Recall) = TP/(TP+FN) = 186/204 = 0.912
-정밀도(Precision) = TP/(TP+FP) = 186/213 = 0.873
+검출 TP: 192 · 미검출 FN: 12 · 오탐 FP: 26
+재현율(Recall) = TP/(TP+FN) = 192/204 = 0.941
+정밀도(Precision) = TP/(TP+FP) = 192/218 = 0.881
 
 카테고리별:
   category           TP   FN   recall
   ADDRESS            24    2     0.92
   API_KEY             5    0     1.00
   AWS_SECRET          2    0     1.00
-  BIZ_NO              6    1     0.86
+  BIZ_NO              7    0     1.00
   CARD                6    0     1.00
   DRIVER_LICENSE      3    0     1.00
   EMAIL              26    0     1.00
   FOREIGN_REG         1    0     1.00
   GCP_KEY             1    0     1.00
-  KR_ACCOUNT         14    4     0.78
+  KR_ACCOUNT         18    0     1.00
   ORGANIZATION        8    3     0.73
   PASSPORT            3    0     1.00
-  PASSWORD            4    1     0.80
+  PASSWORD            5    0     1.00
   PERSON             38    4     0.90
   PHONE              34    1     0.97
   PRIVATE_KEY         1    0     1.00

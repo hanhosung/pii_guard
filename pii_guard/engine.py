@@ -26,6 +26,8 @@ from .categories import ALL_CATEGORIES, CategorySpec
 from .detector import scan_text
 from .masker import apply_redactions, rehydrate_text
 from .models import RedactionResult
+from .proximity import merge as proximity_merge
+from .proximity import scan as proximity_scan
 from .session_map import SessionMap
 
 if TYPE_CHECKING:
@@ -62,6 +64,7 @@ class Engine:
         min_confidence_override: Optional[float] = None,
         hmac_key: Optional[bytes] = None,
         stage2_runner: Optional["Stage2NERRunner"] = None,
+        proximity_enabled: bool = True,
     ) -> None:
         import os
         self._categories = categories or ALL_CATEGORIES
@@ -71,6 +74,9 @@ class Engine:
 
         # Optional Stage-2 NER runner (subprocess-isolated)
         self._stage2_runner = stage2_runner
+
+        # Stage-1.5 positive proximity (context-gated structured PII), on by default
+        self._proximity_enabled = proximity_enabled
 
         # Per-session mutable state — never written to disk
         # All placeholder assignment is delegated to SessionMap
@@ -106,6 +112,15 @@ class Engine:
             allowlist_patterns=self._allowlist,
             min_confidence_override=self._min_confidence,
         )
+
+        # ── Stage 1.5: positive proximity (context-gated structured PII) ──────
+        # Promote ambiguous formats (non-standard account, bare biz-no, Korean
+        # password label) only when a trigger keyword is nearby. Merged into the
+        # Stage-1 set (overlapping spans are skipped) so Stage-2 sees them too.
+        if self._proximity_enabled:
+            stage1_detections = proximity_merge(
+                stage1_detections, proximity_scan(text)
+            )
 
         # ── Stage 2: NER (subprocess-isolated, optional) ──────────────────────
         final_detections = stage1_detections

@@ -36,6 +36,7 @@ class MaskStyle(str, Enum):
 class DetectionStage(str, Enum):
     """Which detection stage found this."""
     STAGE1_REGEX_CHECKSUM = "stage1_regex_checksum"
+    STAGE1_PROXIMITY = "stage1_proximity"
     STAGE2_NER = "stage2_ner"
 
 
