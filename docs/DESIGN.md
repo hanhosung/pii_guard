@@ -170,63 +170,70 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 ## 4. 모듈 맵 (`pii_guard/`)
 
 > 요구사항 §3.2의 계획(`core/ detectors/ …` 중첩)은 구현에서 **평면 패키지**로 수렴했다.
+> 각 표: **모듈 · 주요 공개 API · 책임과 핵심 동작(상세)**.
 
-### 코어 탐지/마스킹
-| 모듈 | 책임 |
-| :-- | :-- |
-| `engine.py` | `Engine.scan(text)` — Stage1 실행 후 (옵션)Stage2 위임, `RedactionResult` 생성 |
-| `detector.py` | Stage1 정규식·체크섬·사전 탐지 실행기 |
-| `categories.py` | **18개 `CategorySpec`** 정의 (패턴·체크섬·액션·신뢰도) |
-| `models.py` | `Detection`, `RedactionResult`, `Action`, `CategoryClass`, `DetectionStage`, `MaskStyle` |
-| `masker.py` | `maskPayload` — 순수 마스킹 함수 |
-| `vault.py` | `RequestVault` — 요청 스코프 마스킹 + 마스크 스타일 적용 |
-| `session_map.py` | `SessionMap` — 원본↔플레이스홀더 세션 일관 매핑(메모리) |
+### 4.A 코어 탐지/마스킹
 
-### Stage2 (NER 서브프로세스)
-| 모듈 | 책임 |
-| :-- | :-- |
-| `stage2/runner.py` | `Stage2NERRunner` — 워커 수명·타임아웃·OOM 격리·degrade |
-| `stage2/_workers.py` | 워커 루프 — 서브프로세스에서 NER 호출(지연 임포트로 모델 로딩 격리) |
-| `stage2/korean_ner.py` | `KoreanNEREngine` — Presidio+spaCy. `resolve_ko_spacy_model()`(lg 우선) |
-| `stage2/policy_layer.py` | `Stage2PolicyLayer` — Stage2 결과에 정책 적용 |
+| 모듈 | 주요 공개 API | 책임 · 핵심 동작 (상세) |
+| :-- | :-- | :-- |
+| `engine.py` | `Engine`, `Engine.scan(text)→RedactionResult` | **탐지 오케스트레이터이자 공용 진입점.** ① `detector.scan_text()`로 Stage1 실행 → ② 생성자에 `stage2_runner`가 있으면 `runner.scan(text, stage1_dets)`로 Stage2 위임 → ③ 두 결과를 병합해 `RedactionResult` 생성. Stage2 실패 시 `coverage_gap=True`·`stage2_gap_reason` 설정. 프록시·CLI·UI·테스트가 **같은 `Engine`을 재사용**(요구사항 §3.2). |
+| `detector.py` | `scan_text(text)` | **Stage1 실행기.** `categories.py`의 모든 `CategorySpec` 패턴을 텍스트에 적용해 매치 수집, 체크섬 검증 통과분만 `Detection`으로 반환. `_resolve_capture_group`로 라벨형 패턴(예: "계좌번호: …")의 캡처 그룹만 정확히 스팬 지정. |
+| `categories.py` | `CategorySpec`, `PatternRule`, `_luhn_valid`·`_rrn_checksum`·`_kr_biz_checksum` | **18개 카테고리 정의의 단일 출처.** 각 `CategorySpec` = (카테고리명·`CategoryClass`·`Action`·`MaskStyle`·`min_confidence`·룰목록). `PatternRule` = (정규식 + 신뢰도 + 선택적 검증자). 검증자가 카드(Luhn)·주민번호·사업자번호의 **산술 유효성**을 확인해 오탐 억제. |
+| `models.py` | `Detection`, `RedactionResult`, `Action`·`CategoryClass`·`MaskStyle`·`DetectionStage` | **시스템 공용 데이터 타입.** `Detection`(스팬·카테고리·액션·placeholder_token·confidence·keyed_hash 등), `RedactionResult`(`redacted_text`, `detections`, `has_blocks`/`has_masks`, `coverage_gap`, `rehydrate()`). 모든 모듈이 이 타입으로 소통. |
+| `masker.py` | `maskPayload`, `apply_redactions`, `rehydrate_text` | **순수 마스킹/복원 함수**(상태 없음). 탐지 스팬을 받아 텍스트를 `[CAT_N]`로 치환하거나 되돌림. 부수효과·세션 상태가 없어 테스트·재사용 용이. |
+| `vault.py` | `RequestVault`, `apply_mask_style` | **요청 스코프 마스킹 금고 + 마스크 스타일.** 한 요청 안에서 원본↔토큰 매핑을 보관하며, `tokenize`(기본)·`partial`(부분 가림)·`format_preserving`(형식 보존 더미) 스타일 적용(`_partial_mask`, `_format_preserving_mask`). |
+| `session_map.py` | `SessionMap` | **세션 일관성 매핑.** 같은 정규화 원본 → 항상 같은 토큰(LLM 문맥 유지). 양방향 조회(원본→토큰, 토큰→원본). **메모리에만** 존재, 디스크 미영속(P4). |
 
-### 프록시 / 프로바이더
-| 모듈 | 책임 |
-| :-- | :-- |
-| `proxy.py` | `PIIGuardProxy` — HTTP 인터셉트·스크럽·포워드·복원·`--log-masked` |
-| `providers/{claude,openai,gemini}.py` | 프로바이더별 와이어 스크러버(`scrub_*_request`) |
-| `providers/{claude,openai,gemini}_parser.py` | 구조 파서 (PII 필드 순회) |
-| `providers/schema_coverage.py` | 스키마 커버리지(필드 방문 추적) |
-| `providers/coverage_alarm.py` | unknown_field → 커버리지 알람(block/warn) |
-| `tripwire.py` | 전체 바디 raw 스윕(안전망) |
+### 4.B Stage2 — NER 서브프로세스
 
-### 복원 / 스트리밍
-| 모듈 | 책임 |
-| :-- | :-- |
-| `response_rehydrator.py` | `ResponsePostProcessor` — 비스트리밍 응답 복원 |
-| `streaming_buffer.py` | 경계 룩어헤드 버퍼(청크 경계 토큰 재조립) |
-| `streaming_rehydrator.py` | 스트리밍 SSE 복원(TTFT 보존) |
+| 모듈 | 주요 공개 API | 책임 · 핵심 동작 (상세) |
+| :-- | :-- | :-- |
+| `stage2/runner.py` | `Stage2NERRunner`, `Stage2ScanResult`, `.scan(text, stage1_dets)` | **워커 수명·타임아웃·OOM 격리·열화 담당.** `multiprocessing`(spawn)으로 NER 워커를 띄우고 요청/응답 큐로 통신. 블록당 **하드 타임아웃**, 워커 OOM/크래시/예외 시 **Stage1 결과로 graceful degrade** + `fail_reason`·coverage_gap. `_merge_detections`로 Stage1+Stage2 병합. 코어는 절대 안 죽음. |
+| `stage2/_workers.py` | `default_ner_worker_loop`, (테스트용 `_test_noop/slow/oom_worker`) | **서브프로세스에서 도는 워커 루프.** `KoreanNEREngine`을 **지연 임포트**해 무거운 spaCy 모델 로딩을 부모(코어)와 격리. 테스트 워커들은 열화 경로(타임아웃·OOM)를 결정적으로 재현. |
+| `stage2/korean_ner.py` | `KoreanNEREngine`, `.detect(text)`, `resolve_ko_spacy_model()` | **실제 NER 엔진(Presidio+spaCy).** `resolve_ko_spacy_model`이 `PIIGUARD_KO_SPACY_MODEL`>`lg`>`sm` 순으로 모델 선택. `_build_presidio_analyzer`가 한국어 전용 `AnalyzerEngine` 구성, `_strip_ko_particle`로 조사 제거("홍길동은"→"홍길동"). spaCy 라벨(PS/LC/OG)→PERSON/ADDRESS/ORGANIZATION 매핑. |
+| `stage2/policy_layer.py` | `Stage2PolicyLayer`, `Stage2PolicyResult` | **Stage2 탐지에 정책 적용.** NER가 찾은 엔티티에 카테고리별 액션(mask)·신뢰도 임계값을 입혀 최종 처리 결정 산출. |
 
-### 정책 / 감사 / 통제면
-| 모듈 | 책임 |
-| :-- | :-- |
-| `policy.py` | `PolicyConfig`, `PolicyLoader`, `SECURE_DEFAULTS`, 핫리로드 |
-| `decision.py` | `PolicyDecisionEngine` — 카테고리×액션 결정, 실패 정책 |
-| `ledger.py` | `Ledger` — append-only, HMAC, 600/700, 회전/보존/purge |
-| `pinlist_guard.py` | 에이전트發 pin-list 변경 차단 |
-| `pinlist_approval.py` | 사용자 out-of-band 승인 게이트 |
-| `pf_manager.py` | egress 락다운 pf(4) 앵커 관리(root) |
-| `boundary.py` | 보호 경계 정직 선언 리포트 |
-| `updater.py` | 룰/모델 서명 검증 업데이트 |
+### 4.C 프록시 / 프로바이더 파싱
 
-### 진입점 / 부가
-| 모듈 | 책임 |
-| :-- | :-- |
-| `cli.py` | `piiguard` CLI (`serve`/`egress`/`ledger`/`boundary`/`pin-list`) |
-| `launcher.py` | `ProcessLauncher` — 자식 프로세스에 base_url env 자동 주입(티어1) |
-| `corpus/korean_pii.py`, `corpus/ner_benchmark_corpus.py` | 합성 레드팀·벤치마크 코퍼스 |
-| `ui/app.py`, `ui/scanner.py` | Streamlit UI + 순수 스캔 로직 |
-| `benchmarks/korean_ner_benchmark.py` | 한국어 NER precision/recall 벤치마크 |
+| 모듈 | 주요 공개 API | 책임 · 핵심 동작 (상세) |
+| :-- | :-- | :-- |
+| `proxy.py` | `PIIGuardProxy`, `_detect_provider(path)`, `_handle_post`, `_forward`, `_log_traffic` | **인터셉트 프록시 코어**(`http.server` 기반, 데몬 스레드). 요청 흐름: 바디 읽기→JSON 파싱→프로바이더 판별→`_scrub()`→`_run_tripwire()`→block이면 400/아니면 `_forward()`. 응답은 복원기로 rehydrate. `--log-masked` 시 `_log_traffic`이 **마스킹된 페이로드만** 출력. pin-list 제어 경로 가로채기, 마지막 scrub/tripwire/rehydration 결과를 테스트용으로 보관. |
+| `providers/{claude,openai,gemini}.py` | `scrub_{claude,openai,gemini}_request(payload, engine, …)` → `*RequestScrubResult` | **프로바이더별 와이어 스크러버**(마스킹 결정 주체). 각 스키마의 PII 필드를 순회(`ScanField`)하며 `engine.scan()` 호출, 결과를 `sanitized_payload`로 치환. `field_events`(감사용)·`should_block` 반환. block-급 카테고리 발견 시 should_block. |
+| `providers/{claude,openai,gemini}_parser.py` | `parse_{provider}_request()` → `{Provider}FieldMap` (`ParsedField`) | **순수 구조 파서**(스캔·마스킹 안 함). 와이어 바디에서 "PII가 들어갈 수 있는 필드 위치"만 구조적으로 추출해 스크러버에 공급. 구조 키 이름 오탐 회피. |
+| `providers/schema_coverage.py` | `diff_{provider}_fields`, `FieldDelta`, `VersionDelta` | **프로토콜 staleness 추적.** 핀 고정된 스키마 대비 **미지 필드/미지 API 버전**을 델타로 산출 → 사각지대 감지. |
+| `providers/coverage_alarm.py` | `emit_*`, `CoverageAlarmEvent`, `CoverageAlarmResult` | **커버리지 알람 발행.** 미지 필드/버전을 `unknown_field_action`(strict 기본 block)에 따라 차단/경고로 변환, 침묵 통과 방지(P5). |
+| `tripwire.py` | `sweep_raw_body(json)` → `TripwireResult`(`TripwireHit`) | **전체 바디 raw 스윕(안전망).** 마스킹된 페이로드 JSON 전체를 다시 훑어 구조 파서가 방문 안 한 필드의 PII-급 히트 포착 → block-급이면 `should_block`. |
+
+### 4.D 복원 / 스트리밍
+
+| 모듈 | 주요 공개 API | 책임 · 핵심 동작 (상세) |
+| :-- | :-- | :-- |
+| `response_rehydrator.py` | `ResponsePostProcessor`, `RehydrationResult` | **비스트리밍 응답 복원.** 업스트림 응답 JSON에서 `[CAT_N]`을 세션 맵으로 실제값 치환(프로바이더별 `_rehydrate_claude/openai/gemini`). 미복원 block-카테고리 토큰 잔존 시 응답 보류/경고. |
+| `streaming_buffer.py` | `StreamingLookAheadBuffer`, `_could_be_placeholder_prefix` | **경계 룩어헤드 버퍼.** 청크 경계에 걸친 *플레이스홀더 후보 prefix*만 작은 윈도우로 보류하고 확정 텍스트는 즉시 방출 → 토큰이 청크에 쪼개져도 재조립. |
+| `streaming_rehydrator.py` | `_extract/_inject_{provider}_stream_text` 등 | **스트리밍 SSE 복원 배선.** 버퍼를 프로바이더별 SSE 이벤트 스트림에 연결, 청크 텍스트를 꺼내 복원 후 재주입. **TTFT 보존**(전체 버퍼링 안 함), 미복원 block 토큰 미방출. |
+
+### 4.E 정책 / 감사 / 통제면
+
+| 모듈 | 주요 공개 API | 책임 · 핵심 동작 (상세) |
+| :-- | :-- | :-- |
+| `policy.py` | `PolicyConfig`, `PolicyLoader`, `SECURE_DEFAULTS`, `CategoryPolicy`·`AllowlistEntry`·`PinListEntry`·`ChannelOverride` | **단일 스키마 정책 로딩·핫리로드.** YAML(`yaml.safe_load`) 파싱, 로드 실패 시 직전 유효 정책 유지. `SECURE_DEFAULTS`는 바이너리 baked-in → 파일 삭제해도 secure default 폴백(P2). 레이어: 기본<파일<채널 override<allowlist. |
+| `decision.py` | `PolicyDecisionEngine`, `PolicyDecision`, `FailureDecision` | **카테고리→액션 결정 + 실패 정책 해석.** 탐지에 allow/mask/block을 매기고, 콘텐츠 실패=block / 인프라 실패=degrade / unscannable=block 등 실패 모드를 결정으로 환원. |
+| `ledger.py` | `Ledger`, `LedgerEventType` | **append-only 감사 원장.** block/mask/fail/coverage-gap 이벤트를 **메타데이터 + HMAC keyed-hash로만** 기록(원본 미영속, P4). 파일 600/디렉토리 700, 회전·보존(기본 30일)·명시적 `purge`. |
+| `pinlist_guard.py` | `PinListMutationGuard`, `classify_source`, `MutationSource` | **에이전트發 pin-list 변경 차단.** 제어 엔드포인트 요청을 출처 분류해 AGENT면 `AGENT_MUTATION_BLOCKED`로 거부 → 탈취된 에이전트의 자기 화이트리스트 방지(P6). |
+| `pinlist_approval.py` | `PinListApprovalGate`, `run_interactive_approval`, 상태 `IDLE/STAGED/COMMITTED/REJECTED` | **사용자 out-of-band 승인 게이트.** pin-list 변경을 staged→사용자 대화형 승인→committed 흐름으로만 반영. 에이전트 루프 밖(사용자)에서만 승인 가능. |
+| `pf_manager.py` | `PfManager`, `collect_all_cidrs`, `build_anchor_rules`, `_pfctl_*` | **egress 락다운(티어2) pf(4) 앵커 관리.** 프로바이더 IP 대역(CIDR) 수집→deny-by-default 앵커/테이블/규칙 빌드→`pfctl`로 로드/해제. root 소유 규칙. |
+| `boundary.py` | `get_protection_boundary()→BoundaryReport`, `EnforcementTier`, `print_boundary_report` | **보호 경계 정직 선언(P3).** 방어/미방어 항목·우회 경로(bypass_paths)·위협 행위자 모델(root 범위 밖)을 구조화해 보고. "막는 척" 금지를 코드로 강제. |
+| `updater.py` | `UpdateSigner`, `UpdateVerifier`, `UpdateManifest`, `UpdateRejectedError` | **룰/모델 서명 검증 업데이트.** 매니페스트 서명 생성·검증으로 비서명/변조 업데이트 거부 → 탐지 룰 공급망 위험 차단(R11). |
+
+### 4.F 진입점 / 부가
+
+| 모듈 | 주요 공개 API | 책임 · 핵심 동작 (상세) |
+| :-- | :-- | :-- |
+| `cli.py` | `cmd_serve`, `cmd_egress_*`, `cmd_ledger_*`, `cmd_boundary`, `cmd_pin_list`, `build_parser` | **`piiguard` CLI 진입점**(argparse). `serve`가 **NER default-on 배선**(`Engine(stage2_runner=…)`)·`--no-ner`·`--log-masked`·fail-closed(SIGTERM→`os._exit`) 담당. egress/ledger/boundary/pin-list 서브커맨드. |
+| `launcher.py` | `ProcessLauncher`, `build_proxy_env`, `ALL_PROXY_ENV_VARS` | **티어1 자동 주입.** 자식 프로세스 env에 `ANTHROPIC_BASE_URL`·`OPENAI_BASE_URL`·`GEMINI_BASE_URL`를 주입해 협조적 도구를 프록시 경유시킴(default-on). |
+| `corpus/korean_pii.py` · `corpus/ner_benchmark_corpus.py` | `KoreanPIICorpus`·`CorpusSample`·`PIISpan`, `NERBenchmarkCorpus` | **합성 레드팀·벤치마크 코퍼스.** 실데이터 없이 **유효 체크섬을 가진 가짜 한국 포맷**(`_make_rrn`, `_make_biz`)으로 정밀도/재현율 측정용 픽스처 생성. |
+| `ui/app.py` · `ui/scanner.py` | (Streamlit 앱) · `scan_text`·`verdict`·`render_console_block` | **대화형 검증 UI + 순수 로직.** `scanner.py`는 Streamlit 비의존(단위테스트됨), `app.py`는 채팅/다중 파일 탭·NER 토글·콘솔 출력. |
+| `benchmarks/korean_ner_benchmark.py` | `run_benchmark()`, `MIN_THRESHOLDS` | **NER precision/recall 벤치마크.** 코퍼스로 full-pipeline·NER-only 지표 측정, 임계값 게이트(`thresholds_met`). |
 
 ---
 
