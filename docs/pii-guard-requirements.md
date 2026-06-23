@@ -89,6 +89,28 @@
 
 ### 3.2 공용 엔진 (재사용 라이브러리)
 
+> 여기서 "재사용"은 **두 가지 의미**를 동시에 담는다.
+> (가) **내부 재사용** — PII-Guard의 탐지 로직을 *하나의 라이브러리*로 만들어, 프록시·CLI·UI·테스트가 **같은 엔진을 공유**한다.
+> (나) **외부 재사용** — 바닥부터 새로 만들지 않고, 검증된 **오픈소스 라이브러리 위에** 얹어 만든다.
+
+#### (가) 내부 재사용 — "엔진은 프록시 전용 스크립트가 아니라 공용 라이브러리"
+
+핵심 탐지 로직(`pii_guard.engine.Engine`)을 **독립 라이브러리**로 두고, 여러 진입점이 그것을 **import 해서 똑같이 재사용**한다. 한 곳에 박아둔 일회용 코드가 아니다.
+
+```python
+from pii_guard import Engine
+result = Engine().scan("연락처 010-1234-5678")   # 어디서든 동일하게 호출
+```
+
+| 같은 `Engine`을 재사용하는 곳 | 용도 |
+| :-- | :-- |
+| `proxy.py` (게이트웨이) | 실제 트래픽 스캔 |
+| `cli.py` (`serve`) | 프록시 기동·NER 연결 |
+| `ui/app.py`·`ui/scanner.py` (Streamlit) | 채팅/파일 PII 확인 |
+| `benchmarks/`·`tests/` | 정확도 측정·회귀 검증 |
+
+→ 덕분에 "UI에서 잡힌 것 = 프록시에서 잡히는 것"이 **자동으로 일치**한다(같은 엔진이므로). 패키지 구조는 아래처럼 기능별로 나뉜다(원래 계획):
+
 ```
 pii_guard/
   core/        # 탐지·정책·마스킹·복원맵 (순수 로직)
@@ -101,6 +123,34 @@ pii_guard/
   ruleset/     # 룰·모델 버전·서명 검증
   config/      # 정책·신뢰경계 스키마
 ```
+
+> **as-built 주의**: 실제 구현은 위 중첩 디렉토리 대신 **평면 `pii_guard/` 패키지**로 수렴했다(모듈맵은 [`DESIGN.md`](./DESIGN.md) §4). 위 표는 *기능 그룹*으로 읽으면 된다.
+
+#### (나) 외부 재사용 — 어떤 오픈소스를 어떻게 응용했나
+
+PII-Guard는 NER·YAML 파싱·HTTP 서버 같은 바퀴를 **다시 발명하지 않는다.** 아래 라이브러리를 가져다 *조립·응용*한다.
+
+| 외부 라이브러리 | 무슨 역할 | PII-Guard에서 어떻게 응용했나 | 사용 모듈 |
+| :-- | :-- | :-- | :-- |
+| **Microsoft Presidio** (`presidio-analyzer`) | PII 탐지 오케스트레이션 프레임워크 | spaCy NER 결과를 받아 **PII 카테고리·신뢰도로 매핑**하는 `AnalyzerEngine`을 구성. 한국어 전용으로 `NlpEngineProvider`·`SpacyRecognizer`를 커스터마이즈 | `stage2/korean_ner.py` |
+| **spaCy** + `ko_core_news_lg` 모델 | 한국어 NLP·NER 엔진 | 정규식이 못 잡는 **문맥상 이름·주소·조직**을 토큰 분류로 탐지. spaCy 라벨(PS/LC/OG)→Presidio 엔티티로 매핑, 조사("홍길동은"→"홍길동") 스트리핑 | `stage2/korean_ner.py` |
+| **PyYAML** (`yaml.safe_load`) | YAML 파싱 | **단일 스키마 정책 파일**·pin-list 승인 파일을 로드(핫리로드). `safe_load`로 임의 객체 역직렬화 차단 | `policy.py`, `pinlist_approval.py` |
+| **Streamlit** | 웹 UI 프레임워크 | 채팅 입력·다중 파일 업로드·콘솔 출력 **로컬 UI**(R16) | `ui/app.py` |
+| **pytest** | 테스트 러너 | 2640개 단위·통합·효능 테스트 + precision/recall 게이트 | `tests/` |
+| **Python 표준 라이브러리** | — | 외부 의존 없이 핵심 보안 기능 구현(아래) | 코어 전반 |
+
+**표준 라이브러리를 핵심 보안에 응용한 부분(외부 의존 최소화 = 공격면 축소, P1):**
+
+| stdlib 모듈 | 응용 |
+| :-- | :-- |
+| `http.server` (`BaseHTTPRequestHandler`/`HTTPServer`) | **인터셉트 프록시 서버** 본체 | 
+| `urllib.request` | 마스킹된 페이로드를 **업스트림으로 포워딩** |
+| `multiprocessing` (spawn 컨텍스트) | **Stage2 NER 워커 격리**(OOM이 코어를 못 죽이게) |
+| `hmac` / `hashlib` | **keyed-hash**(Ledger 저엔트로피 PII 역산 방지) |
+| `re` | Stage1 **정규식 패턴** 탐지 |
+| `signal` / `os._exit` | **fail-closed**(크래시 시 TCP RST) |
+
+> 핵심 원칙: **무거운 신경망(spaCy/Presidio)은 외부 의존으로 두되 별도 프로세스·옵션 설치(`[ner]`)로 격리**하고, **보안 핵심(프록시·해시·차단)은 표준 라이브러리만으로** 구현해 의존 공격면을 줄였다.
 
 ### 3.3 Python 환경 분리
 
