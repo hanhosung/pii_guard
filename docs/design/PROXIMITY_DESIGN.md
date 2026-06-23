@@ -1,8 +1,8 @@
 # 설계 제안 — Proximity(근접 문맥) 기반 탐지 보완
 
-> **구현 현황(2026-06-23)**: ✅ **Phase 1·2 구현·검증 완료** — `stage2/ner_filters.py`(음성),
-> `proximity.py`(양성). 30케이스 검증 재현율 0.92→**0.95**, 정밀도 0.85→**0.94**, 전체 2675 테스트 무회귀.
-> ⏳ Phase 3 정책 YAML 노출만 잔여(현재 `Engine(proximity_enabled=…)` 플래그).
+> **구현 현황(2026-06-23)**: ✅ **Phase 1·2·3 구현·검증 완료** — `stage2/ner_filters.py`(음성),
+> `proximity.py`(양성), 정책 YAML `proximity:` 노출(`policy.py`, serve `--policy`). 30케이스 검증
+> 재현율 0.92→**0.95**, 정밀도 0.85→**0.94**, 전체 **2685 테스트 무회귀**.
 >
 > 상태: **제안(Proposal)** · 작성: 2026-06-23 · 대상: `pii_guard` 탐지 파이프라인
 > 짝 문서: [`../DESIGN.md`](../DESIGN.md)(as-built), [`../../validation/EFFICACY_REPORT.md`](../../validation/EFFICACY_REPORT.md)(검증 근거)

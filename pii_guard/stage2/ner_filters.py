@@ -28,7 +28,24 @@ Design guarantees
 """
 from __future__ import annotations
 
+import os
 import re
+
+# ── Runtime config via env (propagates into the spawned Stage-2 subprocess) ──
+# The policy ``proximity.ner_filter_enabled`` / ``ner_extra_stopwords`` are
+# pushed to these env vars by Engine/serve before the NER worker is spawned;
+# the worker (separate process) inherits them and reads them here at call time.
+_ENV_DISABLE = "PIIGUARD_NER_FILTER_OFF"
+_ENV_EXTRA = "PIIGUARD_NER_EXTRA_STOPWORDS"
+
+
+def _runtime_disabled() -> bool:
+    return os.environ.get(_ENV_DISABLE, "").strip().lower() in ("1", "true", "on", "yes")
+
+
+def _extra_stopwords() -> frozenset:
+    raw = os.environ.get(_ENV_EXTRA, "")
+    return frozenset(w.strip() for w in raw.split(",") if w.strip())
 
 # Spans that NER classifies as PERSON/ORG/ADDRESS but are common Korean nouns,
 # never real entities. Compared after stripping spaces. Keep CONSERVATIVE —
@@ -67,6 +84,8 @@ def is_ner_false_positive(category: str, text: str) -> bool:
     """
     if category not in _NER_CATEGORIES:
         return False
+    if _runtime_disabled():
+        return False  # policy disabled the negative filter entirely
 
     t = text.strip()
     if not t:
@@ -74,8 +93,8 @@ def is_ner_false_positive(category: str, text: str) -> bool:
 
     no_space = t.replace(" ", "")
 
-    # 1. Deny-lists (common nouns / code keywords).
-    if no_space in KOREAN_NER_STOPWORDS:
+    # 1. Deny-lists (common nouns / code keywords) — built-in + policy-supplied.
+    if no_space in KOREAN_NER_STOPWORDS or no_space in _extra_stopwords():
         return True
     if t.lower() in ENGLISH_NER_STOPWORDS:
         return True

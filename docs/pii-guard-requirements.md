@@ -668,5 +668,5 @@ acceptance_criteria:
 **구현 현황** — 상세 [`docs/design/PROXIMITY_DESIGN.md`](./design/PROXIMITY_DESIGN.md):
 - ✅ **Phase 1(음성, NER FP 억제)** — `stage2/ner_filters.py`. 정밀도 0.85→0.93.
 - ✅ **Phase 2(양성 proximity)** — `proximity.py`(Stage-1.5, `STAGE1_PROXIMITY`). 재현율 0.92→0.95. merge containment로 계좌가 전화 오탐 흡수.
-- ⏳ **Phase 3(정책 노출)** — 현재 `Engine(proximity_enabled=…)` 플래그로 토글. 정책 YAML 키워드/윈도우 노출은 잔여.
-- **수용 기준 충족**: 전체 **2675 테스트 무회귀**(0 failed) + 30케이스 재검증 **재현율 0.95 / 정밀도 0.94**(목표 0.94/0.87 초과).
+- ✅ **Phase 3(정책 노출)** — 정책 YAML `proximity:` 블록(트리거 키워드·window·enable·NER필터 노브)을 `PolicyConfig.proximity`로 파싱·핫리로드. `serve --policy PATH`로 로드해 Engine에 연결. NER 필터 노브는 env로 Stage-2 서브프로세스에 전파.
+- **수용 기준 충족**: 전체 **2685 테스트 무회귀**(0 failed) + 30케이스 재검증 **재현율 0.95 / 정밀도 0.94**(목표 0.94/0.87 초과).

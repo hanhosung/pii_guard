@@ -24,6 +24,7 @@ matched trigger is recorded in ``rule_id``). Consistent with requirements DR-2.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Callable, List, NamedTuple, Optional, Tuple
 
 from .categories import _kr_biz_checksum
@@ -40,6 +41,29 @@ _ACCOUNT_VERBS = (
 )
 _ACCOUNT_TRIGGERS = _BANKS + _ACCOUNT_VERBS
 _BIZ_TRIGGERS = ("사업자",)
+_PASSWORD_KEYWORDS = ("비밀번호", "비번", "암호")
+
+
+@dataclass(frozen=True)
+class ProximityConfig:
+    """
+    Policy-exposable proximity settings (PROXIMITY_DESIGN.md §7 / requirements R17).
+
+    Defaults reproduce the built-in behavior; the policy YAML ``proximity:`` block
+    can override any field (keywords / window / enable flags) and is hot-reloaded.
+    """
+    enabled: bool = True
+    window_chars: int = 25
+    account_triggers: Tuple[str, ...] = _ACCOUNT_TRIGGERS
+    biz_triggers: Tuple[str, ...] = _BIZ_TRIGGERS
+    password_keywords: Tuple[str, ...] = _PASSWORD_KEYWORDS
+    # Negative proximity (NER false-positive suppression, applied in the Stage-2
+    # subprocess via env — see stage2/ner_filters.py).
+    ner_filter_enabled: bool = True
+    ner_extra_stopwords: Tuple[str, ...] = ()
+
+
+DEFAULT_PROXIMITY_CONFIG = ProximityConfig()
 
 
 class ContextRule(NamedTuple):
@@ -55,44 +79,58 @@ class ContextRule(NamedTuple):
     validator: Optional[Callable[[str], bool]] = None  # extra checksum on normalized value
 
 
-CONTEXT_RULES: Tuple[ContextRule, ...] = (
-    # KR_ACCOUNT — non-standard 3-3-6 (e.g. 123-456-789012)
-    ContextRule(
-        "KR_ACCOUNT", CategoryClass.KOREAN_PII, Action.TOKENIZE_ROUNDTRIP, MaskStyle.TOKENIZE,
-        re.compile(r"(?<!\d)(\d{3}-\d{3}-\d{6})(?!\d)"),
-        _ACCOUNT_TRIGGERS, 25, 0.70, "prox_kr_acct_336",
-    ),
-    # KR_ACCOUNT — Kakao/Toss style 4-2-7 (e.g. 3333-01-1234567)
-    ContextRule(
-        "KR_ACCOUNT", CategoryClass.KOREAN_PII, Action.TOKENIZE_ROUNDTRIP, MaskStyle.TOKENIZE,
-        re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{7})(?!\d)"),
-        _ACCOUNT_TRIGGERS, 25, 0.70, "prox_kr_acct_427",
-    ),
-    # BIZ_NO — hyphen-less 10 digits, gated by "사업자" + valid checksum
-    ContextRule(
-        "BIZ_NO", CategoryClass.KOREAN_PII, Action.TOKENIZE_ROUNDTRIP, MaskStyle.TOKENIZE,
-        re.compile(r"(?<!\d)(\d{10})(?!\d)"),
-        _BIZ_TRIGGERS, 20, 0.85, "prox_biz_bare10", validator=_kr_biz_checksum,
-    ),
-    # PASSWORD — Korean label (비밀번호 / 비번 / 암호) : value
-    ContextRule(
-        "PASSWORD", CategoryClass.SECRET, Action.BLOCK, MaskStyle.TOKENIZE,
-        re.compile(r"(?:비밀번호|비번|암호)\s*[:=]?\s*([^\s,，.。!?'\"]{4,40})"),
-        (), 0, 0.85, "prox_password_kr",
-    ),
-)
+def build_rules(config: ProximityConfig) -> Tuple[ContextRule, ...]:
+    """Build the context-rule set from a (policy-driven) :class:`ProximityConfig`."""
+    acct = tuple(config.account_triggers)
+    w = config.window_chars
+    pw_alt = "|".join(re.escape(k) for k in config.password_keywords) or "비밀번호"
+    pw_pattern = re.compile(rf"(?:{pw_alt})\s*[:=]?\s*([^\s,，.。!?'\"]{{4,40}})")
+    return (
+        # KR_ACCOUNT — non-standard 3-3-6 (e.g. 123-456-789012)
+        ContextRule(
+            "KR_ACCOUNT", CategoryClass.KOREAN_PII, Action.TOKENIZE_ROUNDTRIP, MaskStyle.TOKENIZE,
+            re.compile(r"(?<!\d)(\d{3}-\d{3}-\d{6})(?!\d)"),
+            acct, w, 0.70, "prox_kr_acct_336",
+        ),
+        # KR_ACCOUNT — Kakao/Toss style 4-2-7 (e.g. 3333-01-1234567)
+        ContextRule(
+            "KR_ACCOUNT", CategoryClass.KOREAN_PII, Action.TOKENIZE_ROUNDTRIP, MaskStyle.TOKENIZE,
+            re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{7})(?!\d)"),
+            acct, w, 0.70, "prox_kr_acct_427",
+        ),
+        # BIZ_NO — hyphen-less 10 digits, gated by "사업자" + valid checksum
+        ContextRule(
+            "BIZ_NO", CategoryClass.KOREAN_PII, Action.TOKENIZE_ROUNDTRIP, MaskStyle.TOKENIZE,
+            re.compile(r"(?<!\d)(\d{10})(?!\d)"),
+            tuple(config.biz_triggers), min(w, 20), 0.85, "prox_biz_bare10",
+            validator=_kr_biz_checksum,
+        ),
+        # PASSWORD — Korean label (비밀번호 / 비번 / 암호) : value
+        ContextRule(
+            "PASSWORD", CategoryClass.SECRET, Action.BLOCK, MaskStyle.TOKENIZE,
+            pw_pattern, (), 0, 0.85, "prox_password_kr",
+        ),
+    )
+
+
+# Pre-built default rule set (no per-call rebuild when using built-in config).
+CONTEXT_RULES: Tuple[ContextRule, ...] = build_rules(DEFAULT_PROXIMITY_CONFIG)
 
 
 def _norm(v: str) -> str:
     return v.replace("-", "").replace(" ", "")
 
 
-def scan(text: str) -> List[Detection]:
+def scan(text: str, config: Optional[ProximityConfig] = None) -> List[Detection]:
     """Return context-gated proximity detections for *text* (may be empty)."""
     if not text:
         return []
+    if config is not None and not config.enabled:
+        return []
+    rules = CONTEXT_RULES if (config is None or config is DEFAULT_PROXIMITY_CONFIG) \
+        else build_rules(config)
     out: List[Detection] = []
-    for rule in CONTEXT_RULES:
+    for rule in rules:
         for m in rule.value_pattern.finditer(text):
             if m.groups():
                 start, end, value = m.start(1), m.end(1), m.group(1)

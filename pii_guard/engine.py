@@ -26,6 +26,7 @@ from .categories import ALL_CATEGORIES, CategorySpec
 from .detector import scan_text
 from .masker import apply_redactions, rehydrate_text
 from .models import RedactionResult
+from .proximity import DEFAULT_PROXIMITY_CONFIG, ProximityConfig
 from .proximity import merge as proximity_merge
 from .proximity import scan as proximity_scan
 from .session_map import SessionMap
@@ -65,6 +66,7 @@ class Engine:
         hmac_key: Optional[bytes] = None,
         stage2_runner: Optional["Stage2NERRunner"] = None,
         proximity_enabled: bool = True,
+        proximity_config: Optional[ProximityConfig] = None,
     ) -> None:
         import os
         self._categories = categories or ALL_CATEGORIES
@@ -75,8 +77,18 @@ class Engine:
         # Optional Stage-2 NER runner (subprocess-isolated)
         self._stage2_runner = stage2_runner
 
-        # Stage-1.5 positive proximity (context-gated structured PII), on by default
-        self._proximity_enabled = proximity_enabled
+        # Stage-1.5 positive proximity (context-gated structured PII).
+        # Config comes from policy (proximity:) or falls back to secure built-ins.
+        self._proximity_config = proximity_config or DEFAULT_PROXIMITY_CONFIG
+        self._proximity_enabled = proximity_enabled and self._proximity_config.enabled
+
+        # Push negative-proximity (NER FP filter) settings to env so the Stage-2
+        # subprocess (spawned later) inherits them.
+        cfg = self._proximity_config
+        # Always (re)set both so a fresh Engine resets any stale values left by a
+        # previous instance — never leak one config's stopwords into another.
+        os.environ["PIIGUARD_NER_FILTER_OFF"] = "" if cfg.ner_filter_enabled else "1"
+        os.environ["PIIGUARD_NER_EXTRA_STOPWORDS"] = ",".join(cfg.ner_extra_stopwords)
 
         # Per-session mutable state — never written to disk
         # All placeholder assignment is delegated to SessionMap
@@ -119,7 +131,7 @@ class Engine:
         # Stage-1 set (overlapping spans are skipped) so Stage-2 sees them too.
         if self._proximity_enabled:
             stage1_detections = proximity_merge(
-                stage1_detections, proximity_scan(text)
+                stage1_detections, proximity_scan(text, self._proximity_config)
             )
 
         # ── Stage 2: NER (subprocess-isolated, optional) ──────────────────────

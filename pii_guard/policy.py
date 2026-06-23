@@ -75,6 +75,16 @@ YAML schema (all fields optional — secure defaults apply for omitted fields)::
       ouroboros:
         stage2_fail_action: block
         fail_mode: closed
+
+    # Proximity (context-gated detection, R17) — all keys optional, omit to keep defaults
+    proximity:
+      enabled: true
+      window_chars: 25
+      account_triggers: [국민, 신한, 우리, 하나, 농협, 토스뱅크, 카카오뱅크, 입금, 이체, 계좌]
+      biz_triggers: [사업자]
+      password_keywords: [비밀번호, 비번, 암호]
+      ner_filter_enabled: true           # negative proximity: suppress NER false positives
+      ner_extra_stopwords: [사내약어]    # extra common-noun deny-list entries
 """
 from __future__ import annotations
 
@@ -87,6 +97,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+from .proximity import ProximityConfig
 
 log = logging.getLogger(__name__)
 
@@ -221,6 +233,9 @@ class PolicyConfig:
 
     # ── Channel overrides ────────────────────────────────────────────────────
     channel_overrides: Dict[str, ChannelOverride] = field(default_factory=dict)
+
+    # ── Proximity (context-gated detection, R17) ─────────────────────────────
+    proximity: ProximityConfig = field(default_factory=ProximityConfig)
 
     # ── Convenience helpers ──────────────────────────────────────────────────
 
@@ -389,6 +404,60 @@ def _parse_pin_list(pl_raw: list) -> List[PinListEntry]:
     return entries
 
 
+def _parse_proximity(raw) -> ProximityConfig:
+    """
+    Parse the ``proximity:`` block into a :class:`ProximityConfig`.
+
+    Any omitted key keeps the secure built-in default. Example::
+
+        proximity:
+          enabled: true
+          window_chars: 25
+          account_triggers: [국민, 신한, 입금, 계좌, 토스뱅크]
+          biz_triggers: [사업자]
+          password_keywords: [비밀번호, 비번, 암호]
+          ner_filter_enabled: true
+          ner_extra_stopwords: [별칭, 사내용어]
+    """
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"'proximity' must be a YAML mapping, got {type(raw).__name__}"
+        )
+    d = ProximityConfig()  # defaults
+
+    def _bool(key, cur):
+        if key in raw:
+            if not isinstance(raw[key], bool):
+                raise ValueError(f"proximity.{key} must be true/false")
+            return raw[key]
+        return cur
+
+    def _strs(key, cur):
+        if key in raw:
+            v = raw[key]
+            if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
+                raise ValueError(f"proximity.{key} must be a list of strings")
+            return tuple(v)
+        return cur
+
+    window = d.window_chars
+    if "window_chars" in raw:
+        w = raw["window_chars"]
+        if not isinstance(w, int) or isinstance(w, bool) or not (1 <= w <= 200):
+            raise ValueError("proximity.window_chars must be an int in [1, 200]")
+        window = w
+
+    return ProximityConfig(
+        enabled=_bool("enabled", d.enabled),
+        window_chars=window,
+        account_triggers=_strs("account_triggers", d.account_triggers),
+        biz_triggers=_strs("biz_triggers", d.biz_triggers),
+        password_keywords=_strs("password_keywords", d.password_keywords),
+        ner_filter_enabled=_bool("ner_filter_enabled", d.ner_filter_enabled),
+        ner_extra_stopwords=_strs("ner_extra_stopwords", d.ner_extra_stopwords),
+    )
+
+
 def _parse_channel_overrides(co_raw: dict) -> Dict[str, ChannelOverride]:
     """Parse and validate the ``channel_overrides`` block."""
     overrides: Dict[str, ChannelOverride] = {}
@@ -495,6 +564,10 @@ def _parse_and_validate(
                 f"'memory_budget_mb' must be an integer ≥ 128, got {mb!r}"
             )
         config.memory_budget_mb = mb
+
+    # ── Proximity (context-gated detection, R17) ─────────────────────────────
+    if "proximity" in data:
+        config.proximity = _parse_proximity(data["proximity"])
 
     # ── Per-category overrides ───────────────────────────────────────────────
     if "categories" in data:

@@ -114,16 +114,22 @@ def cmd_serve(args: argparse.Namespace) -> int:
     signal.  SIGTERM / SIGINT trigger a graceful shutdown; SIGKILL terminates
     immediately (OS handles connection reset).
     """
+    # Load policy (proximity keywords/window + NER-filter knobs come from here;
+    # falls back to secure built-in defaults when no file is given/found).
+    from .policy import load_policy
+    policy = load_policy(getattr(args, "policy", None))
+
     # Secure-by-default: wire the Stage-2 Korean NER engine into the proxy so
     # unstructured PII (person names, addresses, organizations) is masked, not
     # just Stage-1 regex categories. The runner is subprocess-isolated and
     # degrades gracefully to Stage-1 if NER deps/model are unavailable or the
     # worker OOMs/times out (AC 3). Use --no-ner to run Stage-1 only.
-    engine: Optional[Engine] = None
+    runner = None
     if not getattr(args, "no_ner", False):
         from .stage2.runner import Stage2NERRunner
 
-        engine = Engine(stage2_runner=Stage2NERRunner())
+        runner = Stage2NERRunner()
+    engine = Engine(stage2_runner=runner, proximity_config=policy.proximity)
 
     proxy = PIIGuardProxy(
         args.upstream_url,
@@ -551,6 +557,16 @@ def build_parser() -> argparse.ArgumentParser:
             "disable Stage-2 Korean NER (run Stage-1 regex only). NER is ON by "
             "default so person names / addresses / organizations are masked; this "
             "flag is an escape hatch for minimal/low-resource deployments."
+        ),
+    )
+    serve_parser.add_argument(
+        "--policy",
+        metavar="PATH",
+        default=None,
+        help=(
+            "path to a policy YAML. The 'proximity:' block (trigger keywords, "
+            "window, NER-filter knobs) is read from here; omit to use secure "
+            "built-in defaults."
         ),
     )
     serve_parser.add_argument(
