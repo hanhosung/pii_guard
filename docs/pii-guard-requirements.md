@@ -656,15 +656,17 @@ acceptance_criteria:
 **검증(완료)**: 합성 30케이스(한국어 ~1000자 + 영문 시크릿, 실전형)로 실제 엔진을 돌려 재현율·정밀도 측정.
 산출물 = [`validation/EFFICACY_REPORT.md`](../../validation/EFFICACY_REPORT.md)(리포트) + `efficacy_test_log.txt`(증거 로그) + `efficacy_test.py`(재현 하니스).
 
-| 지표 | 수치(보정) | 비고 |
-| :-- | :-- | :-- |
-| 재현율 | **0.92** | 정형 PII(키·카드·여권·이메일·전화)는 사실상 1.00 |
-| 정밀도 | **0.85** | 진짜 over-masking 36건 — 대부분 코드/기술 텍스트 |
+| 지표 | 초기(보정) | **R17 적용 후(보정)** | 비고 |
+| :-- | :-- | :-- | :-- |
+| 재현율 | 0.92 | **0.95** | 정형 PII(키·카드·여권·이메일·전화)는 사실상 1.00 |
+| 정밀도 | 0.85 | **0.94** | 진짜 over-masking 36→13건 |
 
-**갭 → R17 매핑**:
-- KR_ACCOUNT(비표준)·BIZ_NO(맨숫자)·PASSWORD(한글라벨) 미검출 → **양성 proximity**(트리거 근접 시 승격).
-- 코드 텍스트 NER 과잉 마스킹 → **음성 proximity / 콘텐츠 게이팅**(코드 구간 NER 억제, §6.3 부채 해소).
+**갭 → R17 매핑 (✅ 구현 완료)**:
+- KR_ACCOUNT(비표준 3-3-6·토스/카카오 4-2-7)·BIZ_NO(맨숫자)·PASSWORD(한글라벨) → **양성 proximity**(`proximity.py`, 트리거 근접 시 승격).
+- 코드 텍스트 NER 과잉 마스킹 → **음성 proximity**(`stage2/ner_filters.py`, NER FP 후필터: 코드토큰·약어·blob·일반명사 deny-list).
 
-**구현 계획(단계)** — 상세 [`docs/design/PROXIMITY_DESIGN.md`](./design/PROXIMITY_DESIGN.md):
-1. Phase 1 **음성 게이팅** 선행(정밀도, 리스크 최저) → 2. Phase 2 **양성 proximity**(재현율) → 3. Phase 3 정책·감사·문서.
-- **수용 기준**: 기존 2640 테스트 무회귀 + 30케이스 재검증으로 **재현율 ~0.94 / 정밀도 ~0.87** 입증을 머지 게이트로.
+**구현 현황** — 상세 [`docs/design/PROXIMITY_DESIGN.md`](./design/PROXIMITY_DESIGN.md):
+- ✅ **Phase 1(음성, NER FP 억제)** — `stage2/ner_filters.py`. 정밀도 0.85→0.93.
+- ✅ **Phase 2(양성 proximity)** — `proximity.py`(Stage-1.5, `STAGE1_PROXIMITY`). 재현율 0.92→0.95. merge containment로 계좌가 전화 오탐 흡수.
+- ⏳ **Phase 3(정책 노출)** — 현재 `Engine(proximity_enabled=…)` 플래그로 토글. 정책 YAML 키워드/윈도우 노출은 잔여.
+- **수용 기준 충족**: 전체 **2675 테스트 무회귀**(0 failed) + 30케이스 재검증 **재현율 0.95 / 정밀도 0.94**(목표 0.94/0.87 초과).

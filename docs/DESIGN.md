@@ -180,6 +180,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 | `detector.py` | `scan_text(text)` | **Stage1 실행기.** `categories.py`의 모든 `CategorySpec` 패턴을 텍스트에 적용해 매치 수집, 체크섬 검증 통과분만 `Detection`으로 반환. `_resolve_capture_group`로 라벨형 패턴(예: "계좌번호: …")의 캡처 그룹만 정확히 스팬 지정. |
 | `categories.py` | `CategorySpec`, `PatternRule`, `_luhn_valid`·`_rrn_checksum`·`_kr_biz_checksum` | **18개 카테고리 정의의 단일 출처.** 각 `CategorySpec` = (카테고리명·`CategoryClass`·`Action`·`MaskStyle`·`min_confidence`·룰목록). `PatternRule` = (정규식 + 신뢰도 + 선택적 검증자). 검증자가 카드(Luhn)·주민번호·사업자번호의 **산술 유효성**을 확인해 오탐 억제. |
 | `models.py` | `Detection`, `RedactionResult`, `Action`·`CategoryClass`·`MaskStyle`·`DetectionStage` | **시스템 공용 데이터 타입.** `Detection`(스팬·카테고리·액션·placeholder_token·confidence·keyed_hash 등), `RedactionResult`(`redacted_text`, `detections`, `has_blocks`/`has_masks`, `coverage_gap`, `rehydrate()`). 모든 모듈이 이 타입으로 소통. |
+| `proximity.py` | `scan(text)`, `merge(base, extra)`, `ContextRule` | **Stage-1.5 양성 proximity**(context-gated). 모호한 정형 PII(비표준 계좌·맨 사업자번호·한글 비번)를 **트리거 키워드 근접 시에만 승격**. `merge`는 containment 정책(계좌가 전화 하위오탐 흡수). `STAGE1_PROXIMITY` 단계. |
 | `masker.py` | `maskPayload`, `apply_redactions`, `rehydrate_text` | **순수 마스킹/복원 함수**(상태 없음). 탐지 스팬을 받아 텍스트를 `[CAT_N]`로 치환하거나 되돌림. 부수효과·세션 상태가 없어 테스트·재사용 용이. |
 | `vault.py` | `RequestVault`, `apply_mask_style` | **요청 스코프 마스킹 금고 + 마스크 스타일.** 한 요청 안에서 원본↔토큰 매핑을 보관하며, `tokenize`(기본)·`partial`(부분 가림)·`format_preserving`(형식 보존 더미) 스타일 적용(`_partial_mask`, `_format_preserving_mask`). |
 | `session_map.py` | `SessionMap` | **세션 일관성 매핑.** 같은 정규화 원본 → 항상 같은 토큰(LLM 문맥 유지). 양방향 조회(원본→토큰, 토큰→원본). **메모리에만** 존재, 디스크 미영속(P4). |
@@ -192,6 +193,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 | `stage2/_workers.py` | `default_ner_worker_loop`, (테스트용 `_test_noop/slow/oom_worker`) | **서브프로세스에서 도는 워커 루프.** `KoreanNEREngine`을 **지연 임포트**해 무거운 spaCy 모델 로딩을 부모(코어)와 격리. 테스트 워커들은 열화 경로(타임아웃·OOM)를 결정적으로 재현. |
 | `stage2/korean_ner.py` | `KoreanNEREngine`, `.detect(text)`, `resolve_ko_spacy_model()` | **실제 NER 엔진(Presidio+spaCy).** `resolve_ko_spacy_model`이 `PIIGUARD_KO_SPACY_MODEL`>`lg`>`sm` 순으로 모델 선택. `_build_presidio_analyzer`가 한국어 전용 `AnalyzerEngine` 구성, `_strip_ko_particle`로 조사 제거("홍길동은"→"홍길동"). spaCy 라벨(PS/LC/OG)→PERSON/ADDRESS/ORGANIZATION 매핑. |
 | `stage2/policy_layer.py` | `Stage2PolicyLayer`, `Stage2PolicyResult` | **Stage2 탐지에 정책 적용.** NER가 찾은 엔티티에 카테고리별 액션(mask)·신뢰도 임계값을 입혀 최종 처리 결정 산출. |
+| `stage2/ner_filters.py` | `is_ner_false_positive(category, text)` | **음성 proximity / NER FP 후필터.** NER 탐지 중 코드토큰(`API_KEY`,`send_email(...)`)·약어(`AWS`,`LGTM`)·base64 blob·일반명사 deny-list(`주석`,`수익자`)를 제거. **제거만**(recall-safe). 정밀도 0.79→0.87. |
 
 ### 4.C 프록시 / 프로바이더 파싱
 
