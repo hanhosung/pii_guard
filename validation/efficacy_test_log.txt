@@ -1,0 +1,970 @@
+==========================================================================================
+PII-Guard 실효성 검증 로그 (30 케이스)
+엔진: Engine + Stage2NERRunner (ko_core_news_lg) · 모드: 실전형 · 측정: 재현율+정밀도
+==========================================================================================
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[01] 고객 상담 메모
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  오늘 오전에 김서연 고객님이 직접 전화 주셨습니다. 연락처는 010-3344-5566이고, 추가 안내는 이메일 seoyeon.kim@gmail.com 으로 보내달라고 하셨어요. 본인 확인 과정에서 주민등록번호 920723-1641620 불러주셨는데 시스템에 저장은 안 했습니다. 배송지는 서울 마포구 월드컵북로 120 3층이고, 환불 계좌는 국민은행 123456-78-901234 라고 하셨습니다. 결제했던 카드 4111-1111-1111-1111 끝자리가 안 맞아 재확인 요청 드렸고요. 참고로 상담 티켓 번호는 ORD-20240613-0091 입니다. 다음 상담은 6월 20일 오후 2시로 예약했습니다.
+
+GROUND TRUTH (7): PERSON=김서연, PHONE=010-3344-5566, EMAIL=seoyeon.kim@gmail.com, RRN=920723-1641620, ADDRESS=서울 마포구 월드컵북로 120, KR_ACCOUNT=123456-78-901234, CARD=4111-1111-1111-1111
+TRAPS (탐지되면 오탐): ORD-20240613-0091
+
+RAW DETECTIONS (8):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '김서연'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-3344-5566'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'seoyeon.kim@gmail.com'
+  · RRN            [BLOCK] '920723-1641620'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 마포구 월드컵북로 120'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '국민은행'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '123456-78-901234'
+  · CARD           [BLOCK] '4111-1111-1111-1111'
+
+✅ 검출 TP (7):
+  · PERSON         '김서연'
+  · PHONE          '010-3344-5566'
+  · EMAIL          'seoyeon.kim@gmail.com'
+  · RRN            '920723-1641620'
+  · ADDRESS        '서울 마포구 월드컵북로 120'
+  · KR_ACCOUNT     '123456-78-901234'
+  · CARD           '4111-1111-1111-1111'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (1):
+  · ORGANIZATION   '국민은행'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[02] 개발자 슬랙 메시지 (시크릿 유출)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  @here 긴급합니다. 방금 스테이징 배포하다가 실수로 환경변수를 로그에 찍어버렸어요. AWS 키 AKIAIOSFODNN7EXAMPLE 랑 시크릿이 그대로 노출됐고, OpenAI 키도 sk-abcdefghijklmnopqrstuvwxyz1234567890 이게 커밋에 들어갔습니다. 깃헙 토큰 ghp_1234567890abcdefghijklmnopqrstuvwxyz12 도 같이요. 일단 전부 무효화(rotate) 하겠습니다. DB 접속 비번도 password=Sup3rSecret!2024 로 평문이라 바꿔야 해요. 관련 PR은 #1423, 빌드 버전은 v2.3.1 입니다. 인프라팀 박지훈 님께 공유 부탁드려요. 사내 위키 https://wiki.internal/runbook 참고하세요.
+
+GROUND TRUTH (5): AWS_SECRET=AKIAIOSFODNN7EXAMPLE, API_KEY=sk-abcdefghijklmnopqrstuvwxyz1234567890, API_KEY=ghp_1234567890abcdefghijklmnopqrstuvwxyz12, PASSWORD=Sup3rSecret!2024, PERSON=박지훈
+TRAPS (탐지되면 오탐): #1423, v2.3.1
+
+RAW DETECTIONS (7):
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'AWS'
+  · AWS_SECRET     [BLOCK] 'AKIAIOSFODNN7EXAMPLE'
+  · API_KEY        [BLOCK] 'sk-abcdefghijklmnopqrstuvwxyz1234567890'
+  · API_KEY        [BLOCK] 'ghp_1234567890abcdefghijklmnopqrstuvwxyz12'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'rotate'
+  · PASSWORD       [BLOCK] 'Sup3rSecret!2024'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '박지훈'
+
+✅ 검출 TP (5):
+  · AWS_SECRET     'AKIAIOSFODNN7EXAMPLE'
+  · API_KEY        'sk-abcdefghijklmnopqrstuvwxyz1234567890'
+  · API_KEY        'ghp_1234567890abcdefghijklmnopqrstuvwxyz12'
+  · PASSWORD       'Sup3rSecret!2024'
+  · PERSON         '박지훈'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (2):
+  · ORGANIZATION   'AWS'
+  · ORGANIZATION   'rotate'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[03] 병원 접수 안내 이메일
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  안녕하세요, 환자분. 내일 진료 예약 확인차 연락드립니다. 성함 이도현, 생년월일 1988-03-12, 연락처 010-7788-9900 으로 등록되어 있습니다. 접수 시 주민번호 770123-4279267 필요합니다. 초진 문진표는 dohyun.lee@daum.net 으로 발송했으니 작성 부탁드립니다. 병원 위치는 서울 송파구 올림픽로 300 메디컬타워 5층이며, 주차 등록 차량은 12가 3456 입니다. 수납은 카드 5500-0055-5555-5559 또는 현금 가능합니다. 진료과는 정형외과, 담당의는 최민호 과장입니다.
+
+GROUND TRUTH (7): PERSON=이도현, PHONE=010-7788-9900, RRN=770123-4279267, EMAIL=dohyun.lee@daum.net, ADDRESS=서울 송파구 올림픽로 300, CARD=5500-0055-5555-5559, PERSON=최민호
+TRAPS (탐지되면 오탐): 1988-03-12, 12가 3456
+
+RAW DETECTIONS (9):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '이도현'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '생년월일'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-7788-9900'
+  · RRN            [BLOCK] '770123-4279267'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '문진표'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'dohyun.lee@daum.net'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 송파구 올림픽로 300'
+  · CARD           [BLOCK] '5500-0055-5555-5559'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '최민호'
+
+✅ 검출 TP (7):
+  · PERSON         '이도현'
+  · PHONE          '010-7788-9900'
+  · RRN            '770123-4279267'
+  · EMAIL          'dohyun.lee@daum.net'
+  · ADDRESS        '서울 송파구 올림픽로 300'
+  · CARD           '5500-0055-5555-5559'
+  · PERSON         '최민호'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (2):
+  · ADDRESS        '생년월일'
+  · PERSON         '문진표'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[04] 채용 지원 서류 요약
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  지원자 정보 정리합니다. 이름 강하늘, 휴대폰 010-2233-4455, 이메일 haneul.kang@kakao.com. 현 주소는 경기도 성남시 분당구 판교역로 235 이고, 전 직장은 네이버였습니다. 포트폴리오는 깃헙 https://github.com/haneulk 에 있고, 비상연락망으로 부친 010-9001-2002 도 받았습니다. 여권번호 M12345678 (해외 출장 이력 확인용), 운전면허 11-19-123456-01 소지. 희망 연봉은 6,500만원, 입사 가능일 7월 1일. 학력은 2015년 졸업입니다.
+
+GROUND TRUTH (8): PERSON=강하늘, PHONE=010-2233-4455, EMAIL=haneul.kang@kakao.com, ADDRESS=경기도 성남시 분당구 판교역로 235, ORGANIZATION=네이버, PHONE=010-9001-2002, PASSPORT=M12345678, DRIVER_LICENSE=11-19-123456-01
+TRAPS (탐지되면 오탐): 6,500만원, 2015년
+
+RAW DETECTIONS (8):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '강하늘'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-2233-4455'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'haneul.kang@kakao.com'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '경기도 성남시 분당구 판교역로 235'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-9001-2002'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '여권번호'
+  · PASSPORT       [BLOCK] 'M12345678'
+  · DRIVER_LICENSE [BLOCK] '11-19-123456-01'
+
+✅ 검출 TP (7):
+  · PERSON         '강하늘'
+  · PHONE          '010-2233-4455'
+  · EMAIL          'haneul.kang@kakao.com'
+  · ADDRESS        '경기도 성남시 분당구 판교역로 235'
+  · PHONE          '010-9001-2002'
+  · PASSPORT       'M12345678'
+  · DRIVER_LICENSE '11-19-123456-01'
+❌ 미검출 FN (1):
+  · ORGANIZATION   '네이버'
+⚠️  오탐 후보 FP (1):
+  · PERSON         '여권번호'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[05] 택배 분실 문의 (비표준 계좌 — 갭)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  배송 못 받아서 문의드려요. 받는 사람 윤지우, 전화 010-5566-7788 입니다. 주소는 인천 연수구 송도과학로 32 아파트 105동 1203호예요. 보상은 신한은행 계좌로 받을게요, 계좌번호는 110-123456-78901 입니다. 혹시 안 되면 다른 계좌 123-456-789012 로 부탁해요. 구매할 때 적은 이메일은 jiwoo.yoon@naver.com 이고요. 운송장 번호는 123456789012 입니다. 빠른 처리 부탁드립니다. 사업자등록번호 180-63-41205 로 세금계산서도 필요해요.
+
+GROUND TRUTH (7): PERSON=윤지우, PHONE=010-5566-7788, ADDRESS=인천 연수구 송도과학로 32, KR_ACCOUNT=110-123456-78901, KR_ACCOUNT=123-456-789012, EMAIL=jiwoo.yoon@naver.com, BIZ_NO=180-63-41205
+TRAPS (탐지되면 오탐): 123456789012
+
+RAW DETECTIONS (8):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '윤지우'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-5566-7788'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '인천 연수구 송도과학로 32 아파트 105동 1203'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '신한은행'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '110-123456-78901'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'jiwoo.yoon@naver.com'
+  · DRIVER_LICENSE [BLOCK] '123456789012'
+  · BIZ_NO         [TOKENIZE_ROUNDTRIP] '180-63-41205'
+
+✅ 검출 TP (6):
+  · PERSON         '윤지우'
+  · PHONE          '010-5566-7788'
+  · ADDRESS        '인천 연수구 송도과학로 32'
+  · KR_ACCOUNT     '110-123456-78901'
+  · EMAIL          'jiwoo.yoon@naver.com'
+  · BIZ_NO         '180-63-41205'
+❌ 미검출 FN (1):
+  · KR_ACCOUNT     '123-456-789012'
+⚠️  오탐 후보 FP (2):
+  · ORGANIZATION   '신한은행'
+  · DRIVER_LICENSE '123456789012'  [TRAP-확정오탐]
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[06] 부동산 계약 메모
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  매매 계약 건 정리. 매도인 한상우, 연락처 010-1212-3434. 매수인 오세훈, 010-5656-7878. 물건지는 서울 강남구 도곡로 401 타워팰리스 입니다. 매도인 주민번호 340128-1381696 확인했고, 계약금은 우리은행 1002-345-678901 로 입금 예정입니다. 중개사무소는 대박공인중개사, 사업자번호 469-80-91148. 등기 관련 서류는 sangwoo.han@gmail.com 으로 보냅니다. 계약일은 6월 25일, 잔금일은 8월 30일입니다. 매매가 18억 5천.
+
+GROUND TRUTH (9): PERSON=한상우, PHONE=010-1212-3434, PERSON=오세훈, PHONE=010-5656-7878, ADDRESS=서울 강남구 도곡로 401, RRN=340128-1381696, KR_ACCOUNT=1002-345-678901, BIZ_NO=469-80-91148, EMAIL=sangwoo.han@gmail.com
+TRAPS (탐지되면 오탐): 18억 5천
+
+RAW DETECTIONS (10):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '한상우'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-1212-3434'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '오세훈'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-5656-7878'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 강남구 도곡로 401'
+  · RRN            [BLOCK] '340128-1381696'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '우리은행'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '1002-345-678901'
+  · BIZ_NO         [TOKENIZE_ROUNDTRIP] '469-80-91148'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'sangwoo.han@gmail.com'
+
+✅ 검출 TP (9):
+  · PERSON         '한상우'
+  · PHONE          '010-1212-3434'
+  · PERSON         '오세훈'
+  · PHONE          '010-5656-7878'
+  · ADDRESS        '서울 강남구 도곡로 401'
+  · RRN            '340128-1381696'
+  · KR_ACCOUNT     '1002-345-678901'
+  · BIZ_NO         '469-80-91148'
+  · EMAIL          'sangwoo.han@gmail.com'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (1):
+  · ORGANIZATION   '우리은행'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[07] 외국인 직원 인사 등록
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  신규 입사 외국인 직원 등록 건입니다. 영문명 John Smith, 한글명 존스미스, 외국인등록번호 900101-5234567 입니다. 연락처 010-4040-5050, 이메일 john.smith@company.io. 거주지는 서울 용산구 이태원로 200 입니다. 여권번호는 S98765432 이고, 급여 계좌는 하나은행 123456-78-901234 로 등록했습니다. 비자 만료일 2026-12-31. 소속은 글로벌사업팀이며 사번은 EMP-2024-0312 입니다.
+
+GROUND TRUTH (7): PERSON=존스미스, FOREIGN_REG=900101-5234567, PHONE=010-4040-5050, EMAIL=john.smith@company.io, ADDRESS=서울 용산구 이태원로 200, PASSPORT=S98765432, KR_ACCOUNT=123456-78-901234
+TRAPS (탐지되면 오탐): EMP-2024-0312, 2026-12-31
+
+RAW DETECTIONS (9):
+  · PERSON         [TOKENIZE_ROUNDTRIP] 'John Smith'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '존스미스'
+  · FOREIGN_REG    [BLOCK] '900101-5234567'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-4040-5050'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'john.smith@company.io'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 용산구 이태원로 200'
+  · PASSPORT       [BLOCK] 'S98765432'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '하나은행'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '123456-78-901234'
+
+✅ 검출 TP (7):
+  · PERSON         '존스미스'
+  · FOREIGN_REG    '900101-5234567'
+  · PHONE          '010-4040-5050'
+  · EMAIL          'john.smith@company.io'
+  · ADDRESS        '서울 용산구 이태원로 200'
+  · PASSPORT       'S98765432'
+  · KR_ACCOUNT     '123456-78-901234'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (2):
+  · PERSON         'John Smith'
+  · ORGANIZATION   '하나은행'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[08] 회의록 (tool_result 시뮬레이션)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  [시스템 로그 첨부] 운영 서버 점검 결과입니다. 관리자 계정 admin 의 임시 비밀번호는 password=Adm1n!Temp2024 로 설정되어 있었고, 즉시 변경 권고합니다. 서비스 계정 키 AIzaSyA1234567890abcdefghijklmnopqrstuvw 가 코드에 하드코딩되어 있습니다. JWT 세션 토큰 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123ghiJKL 도 로그에 남아 있었습니다. 점검 담당자 신우진 책임, 내선 010-6060-7070. 다음 점검은 분기말. 영향받는 서비스는 결제 모듈 v4.1.0 입니다.
+
+GROUND TRUTH (5): PASSWORD=Adm1n!Temp2024, GCP_KEY=AIzaSyA1234567890abcdefghijklmnopqrstuvw, TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123ghiJKL, PERSON=신우진, PHONE=010-6060-7070
+TRAPS (탐지되면 오탐): v4.1.0, admin
+
+RAW DETECTIONS (7):
+  · PERSON         [TOKENIZE_ROUNDTRIP] 'admin'
+  · PASSWORD       [BLOCK] 'Adm1n!Temp2024'
+  · GCP_KEY        [BLOCK] 'AIzaSyA1234567890abcdefghijklmnopqrstuv'
+  · PERSON         [TOKENIZE_ROUNDTRIP] 'JWT'
+  · TOKEN          [BLOCK] 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123ghiJKL'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '신우진'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-6060-7070'
+
+✅ 검출 TP (5):
+  · PASSWORD       'Adm1n!Temp2024'
+  · GCP_KEY        'AIzaSyA1234567890abcdefghijklmnopqrstuvw'
+  · TOKEN          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123ghiJKL'
+  · PERSON         '신우진'
+  · PHONE          '010-6060-7070'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (2):
+  · PERSON         'admin'  [TRAP-확정오탐]
+  · PERSON         'JWT'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[09] 은행 콜센터 스크립트 (한글 비번 라벨 — 갭)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  고객님 본인확인 진행하겠습니다. 성함 배수지 고객님 맞으신가요? 등록된 전화 010-7070-8080 마지막 네 자리 확인됐습니다. 인터넷뱅킹 비밀번호: SecurePw99 라고 메모에 적혀 있는데 보안상 폐기하겠습니다. 주민등록번호 010809-2201058 확인 완료했고요. 자택 주소는 대전 유성구 대학로 99 입니다. 출금 계좌 신한 110-123456-78901, 이메일 suji.bae@hanmail.net. 최근 거래 내역은 앱에서 확인 가능합니다. 상담사 번호는 1588-0000 입니다.
+
+GROUND TRUTH (7): PERSON=배수지, PHONE=010-7070-8080, PASSWORD=SecurePw99, RRN=010809-2201058, ADDRESS=대전 유성구 대학로 99, KR_ACCOUNT=110-123456-78901, EMAIL=suji.bae@hanmail.net
+TRAPS (탐지되면 오탐): 1588-0000
+
+RAW DETECTIONS (6):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '배수지'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-7070-8080'
+  · RRN            [BLOCK] '010809-2201058'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '대전 유성구 대학로 99'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '110-123456-78901'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'suji.bae@hanmail.net'
+
+✅ 검출 TP (6):
+  · PERSON         '배수지'
+  · PHONE          '010-7070-8080'
+  · RRN            '010809-2201058'
+  · ADDRESS        '대전 유성구 대학로 99'
+  · KR_ACCOUNT     '110-123456-78901'
+  · EMAIL          'suji.bae@hanmail.net'
+❌ 미검출 FN (1):
+  · PASSWORD       'SecurePw99'
+⚠️  오탐 후보 FP (0):
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[10] 개인 일기 (문맥형 PII)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  오랜만에 대학 동기 모임에 다녀왔다. 민준이랑 서윤이는 여전했고, 특히 박건우는 삼성전자 들어갔다고 자랑하더라. 나는 다음 주에 카카오 면접이 있어서 좀 긴장된다. 집에 오는 길에 강남역 근처에서 우연히 옛 직장 상사 김태형 부장님을 만났는데, 연락처 받아뒀다. 010-3030-2020. 다음에 밥 한번 먹기로 했다. 요즘 사는 동네 서초구 반포대로 58 은 조용하고 좋다. 내일은 운동 좀 해야지.
+
+GROUND TRUTH (6): PERSON=박건우, ORGANIZATION=삼성전자, ORGANIZATION=카카오, PERSON=김태형, PHONE=010-3030-2020, ADDRESS=서초구 반포대로 58
+TRAPS (탐지되면 오탐): 강남역
+
+RAW DETECTIONS (9):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '민준이랑'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '서윤이'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '박건우'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '삼성전자'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '카카오'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '강남역'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '김태형'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-3030-2020'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서초구 반포대'
+
+✅ 검출 TP (6):
+  · PERSON         '박건우'
+  · ORGANIZATION   '삼성전자'
+  · ORGANIZATION   '카카오'
+  · PERSON         '김태형'
+  · PHONE          '010-3030-2020'
+  · ADDRESS        '서초구 반포대로 58'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (3):
+  · PERSON         '민준이랑'
+  · PERSON         '서윤이'
+  · ADDRESS        '강남역'  [TRAP-확정오탐]
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[11] 온라인 쇼핑 주문 확인
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  주문해주셔서 감사합니다. 주문자 임채원 님, 결제 금액 89,000원 확인되었습니다. 배송지: 광주 서구 상무중앙로 7 오피스텔 808호. 연락처 010-8181-9292. 결제 카드 4111-1111-1111-1111 승인 완료. 적립 포인트는 chaewon.lim@gmail.com 계정에 쌓였습니다. 교환/반품 문의는 고객센터로 부탁드립니다. 주문번호 2024-0613-77882, 송장번호는 발송 후 안내드립니다. 멤버십 등급은 GOLD입니다.
+
+GROUND TRUTH (5): PERSON=임채원, ADDRESS=광주 서구 상무중앙로 7, PHONE=010-8181-9292, CARD=4111-1111-1111-1111, EMAIL=chaewon.lim@gmail.com
+TRAPS (탐지되면 오탐): 89,000원, 2024-0613-77882, GOLD
+
+RAW DETECTIONS (5):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '임채원'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '광주 서구 상무중앙로 7'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-8181-9292'
+  · CARD           [BLOCK] '4111-1111-1111-1111'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'chaewon.lim@gmail.com'
+
+✅ 검출 TP (5):
+  · PERSON         '임채원'
+  · ADDRESS        '광주 서구 상무중앙로 7'
+  · PHONE          '010-8181-9292'
+  · CARD           '4111-1111-1111-1111'
+  · EMAIL          'chaewon.lim@gmail.com'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (0):
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[12] 법률 상담 요청서
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  교통사고 손해배상 관련 상담 요청합니다. 의뢰인 성명 조은별, 주민번호 300504-4502140. 사고 일시 6월 1일, 장소는 부산 해운대구 우동 1408 사거리. 연락처 010-2727-3838, 이메일 eunbyul.jo@outlook.com. 상대 차량 운전자는 면허번호 23-45-678901-23 소지자였고, 보험사는 삼성화재입니다. 합의금 입금 계좌는 농협 1002-345-678901. 관련 진단서와 사고 사진은 별도 첨부합니다. 사건번호는 추후 부여 예정.
+
+GROUND TRUTH (8): PERSON=조은별, RRN=300504-4502140, ADDRESS=부산 해운대구 우동 1408, PHONE=010-2727-3838, EMAIL=eunbyul.jo@outlook.com, DRIVER_LICENSE=23-45-678901-23, ORGANIZATION=삼성화재, KR_ACCOUNT=1002-345-678901
+
+RAW DETECTIONS (9):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '조은별'
+  · RRN            [BLOCK] '300504-4502140'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '부산 해운대구 우동 1408 사거리'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-2727-3838'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'eunbyul.jo@outlook.com'
+  · DRIVER_LICENSE [BLOCK] '23-45-678901-23'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '삼성화재입니다'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '농협'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '1002-345-678901'
+
+✅ 검출 TP (8):
+  · PERSON         '조은별'
+  · RRN            '300504-4502140'
+  · ADDRESS        '부산 해운대구 우동 1408'
+  · PHONE          '010-2727-3838'
+  · EMAIL          'eunbyul.jo@outlook.com'
+  · DRIVER_LICENSE '23-45-678901-23'
+  · ORGANIZATION   '삼성화재'
+  · KR_ACCOUNT     '1002-345-678901'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (1):
+  · ORGANIZATION   '농협'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[13] DevOps 인시던트 리포트
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  장애 보고: 02시 14분 결제 API 오류 급증. 원인은 만료된 인증서와 유출된 자격증명입니다. 유출된 프라이빗 키 일부:
+  -----BEGIN RSA PRIVATE KEY-----
+  MIIBOgIBAAJBAKj34GkxFh
+  -----END RSA PRIVATE KEY-----
+  그리고 슬랙 웹훅에 박힌 토큰 ghp_abcdEFGH1234567890ijklMNOP1234567890qZ 발견. 대응 담당 한지민, 비상 연락 010-9999-8888. 영향받은 고객 약 1,200명. 롤백 버전은 release-2024.06.13. 사후 분석 회의는 내일 10시입니다.
+
+GROUND TRUTH (4): PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----, API_KEY=ghp_abcdEFGH1234567890ijklMNOP1234567890qZ, PERSON=한지민, PHONE=010-9999-8888
+TRAPS (탐지되면 오탐): release-2024.06.13, 1,200명
+
+RAW DETECTIONS (6):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '프라이빗'
+  · PRIVATE_KEY    [BLOCK] '-----BEGIN RSA PRIVATE KEY-----'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'MIIBOgIBAAJBAKj34GkxFh'
+  · API_KEY        [BLOCK] 'ghp_abcdEFGH1234567890ijklMNOP1234567890qZ'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '한지민'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-9999-8888'
+
+✅ 검출 TP (4):
+  · PRIVATE_KEY    '-----BEGIN RSA PRIVATE KEY-----'
+  · API_KEY        'ghp_abcdEFGH1234567890ijklMNOP1234567890qZ'
+  · PERSON         '한지민'
+  · PHONE          '010-9999-8888'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (2):
+  · PERSON         '프라이빗'
+  · ORGANIZATION   'MIIBOgIBAAJBAKj34GkxFh'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[14] 학원 등록 상담
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  자녀 수학 단과 등록 문의 주셔서 감사합니다. 학생 이름 최서진, 학부모 성함 최영수. 학부모 연락처 010-4545-6767, 비상연락 010-7654-3210. 집 주소는 대구 수성구 동대구로 23 입니다. 등록비는 카드 5500-0055-5555-5559 로 결제 가능하고, 계좌이체는 국민 123456-78-901234 도 됩니다. 안내 메일은 youngsoo.choi@gmail.com 으로 보내드릴게요. 셔틀버스 노선은 A코스입니다. 개강은 7월 첫째 주.
+
+GROUND TRUTH (8): PERSON=최서진, PERSON=최영수, PHONE=010-4545-6767, PHONE=010-7654-3210, ADDRESS=대구 수성구 동대구로 23, CARD=5500-0055-5555-5559, KR_ACCOUNT=123456-78-901234, EMAIL=youngsoo.choi@gmail.com
+TRAPS (탐지되면 오탐): A코스
+
+RAW DETECTIONS (8):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '최서진'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '최영수'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-4545-6767'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-7654-3210'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '대구 수성구 동대구로 23'
+  · CARD           [BLOCK] '5500-0055-5555-5559'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '123456-78-901234'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'youngsoo.choi@gmail.com'
+
+✅ 검출 TP (8):
+  · PERSON         '최서진'
+  · PERSON         '최영수'
+  · PHONE          '010-4545-6767'
+  · PHONE          '010-7654-3210'
+  · ADDRESS        '대구 수성구 동대구로 23'
+  · CARD           '5500-0055-5555-5559'
+  · KR_ACCOUNT     '123456-78-901234'
+  · EMAIL          'youngsoo.choi@gmail.com'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (0):
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[15] 환자 차트 인계 노트
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  야간 인계합니다. 301호 환자 권나라, 760312-2345671 진통제 투여 후 안정. 보호자 연락처 010-1313-2424. 302호 환자 정우성, 주소 서울 종로구 종로 1 거주, 내일 오전 퇴원 예정입니다. 약 처방전은 nara.kwon@medi.kr 로 발송 요청 들어왔어요. 303호는 금식 유지. 응급 연락은 당직의 010-5151-6262. 병동 비밀번호는 분기마다 변경됩니다. 다음 라운딩은 6시입니다.
+
+GROUND TRUTH (7): PERSON=권나라, RRN=760312-2345671, PHONE=010-1313-2424, PERSON=정우성, ADDRESS=서울 종로구 종로 1, EMAIL=nara.kwon@medi.kr, PHONE=010-5151-6262
+
+RAW DETECTIONS (6):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '권나'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-1313-2424'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '정우성'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '주소 서울 종로구 종'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'nara.kwon@medi.kr'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-5151-6262'
+
+✅ 검출 TP (5):
+  · PERSON         '권나라'
+  · PHONE          '010-1313-2424'
+  · PERSON         '정우성'
+  · EMAIL          'nara.kwon@medi.kr'
+  · PHONE          '010-5151-6262'
+❌ 미검출 FN (2):
+  · RRN            '760312-2345671'
+  · ADDRESS        '서울 종로구 종로 1'
+⚠️  오탐 후보 FP (1):
+  · ADDRESS        '주소 서울 종로구 종'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[16] 프리랜서 계약/정산
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  6월 외주 정산 안내드립니다. 작업자 성함 남도일, 사업자등록번호 010-24-69680 (간이과세). 정산 금액 330만원, 입금 계좌는 카카오뱅크 3333-01-1234567 입니다. 세금계산서 발행 위해 이메일 doil.nam@gmail.com 확인 부탁드려요. 연락처 010-3636-4747. 계약서상 주소는 서울 영등포구 여의대로 24. 다음 프로젝트는 8월 시작 예정이며, NDA 서명본은 별도 보관합니다. 인보이스 번호 INV-0613.
+
+GROUND TRUTH (6): PERSON=남도일, BIZ_NO=010-24-69680, KR_ACCOUNT=3333-01-1234567, EMAIL=doil.nam@gmail.com, PHONE=010-3636-4747, ADDRESS=서울 영등포구 여의대로 24
+TRAPS (탐지되면 오탐): 330만원, INV-0613
+
+RAW DETECTIONS (6):
+  · BIZ_NO         [TOKENIZE_ROUNDTRIP] '010-24-69680'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '카카오뱅크'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'doil.nam@gmail.com'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-3636-4747'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 영등포구 여의대로 24'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'NDA'
+
+✅ 검출 TP (4):
+  · BIZ_NO         '010-24-69680'
+  · EMAIL          'doil.nam@gmail.com'
+  · PHONE          '010-3636-4747'
+  · ADDRESS        '서울 영등포구 여의대로 24'
+❌ 미검출 FN (2):
+  · PERSON         '남도일'
+  · KR_ACCOUNT     '3333-01-1234567'
+⚠️  오탐 후보 FP (2):
+  · ORGANIZATION   '카카오뱅크'
+  · ORGANIZATION   'NDA'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[17] 보험 가입 설계
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  종신보험 설계 내역입니다. 피보험자 황민영, 주민번호 310124-2427977. 월 납입액 12만원, 가입자 연락처 010-8282-9393, 이메일 minyoung.hwang@nate.com. 자동이체 계좌 우리 1002-345-678901 등록 예정. 주소는 울산 남구 삼산로 100. 수익자는 배우자 황지훈으로 지정. 청약 카드 4111-1111-1111-1111 로 첫 회 결제. 보장 개시일은 익월 1일입니다. 증권번호는 발급 후 안내드립니다.
+
+GROUND TRUTH (8): PERSON=황민영, RRN=310124-2427977, PHONE=010-8282-9393, EMAIL=minyoung.hwang@nate.com, KR_ACCOUNT=1002-345-678901, ADDRESS=울산 남구 삼산로 100, PERSON=황지훈, CARD=4111-1111-1111-1111
+TRAPS (탐지되면 오탐): 12만원
+
+RAW DETECTIONS (9):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '황민영'
+  · RRN            [BLOCK] '310124-2427977'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-8282-9393'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'minyoung.hwang@nate.com'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '1002-345-678901'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '울산 남구 삼산로 100'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '수익자'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '황지훈'
+  · CARD           [BLOCK] '4111-1111-1111-1111'
+
+✅ 검출 TP (8):
+  · PERSON         '황민영'
+  · RRN            '310124-2427977'
+  · PHONE          '010-8282-9393'
+  · EMAIL          'minyoung.hwang@nate.com'
+  · KR_ACCOUNT     '1002-345-678901'
+  · ADDRESS        '울산 남구 삼산로 100'
+  · PERSON         '황지훈'
+  · CARD           '4111-1111-1111-1111'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (1):
+  · PERSON         '수익자'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[18] 코드 리뷰 코멘트 (코드+PII 혼합)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  리뷰 남깁니다. config.py 에 테스트용 자격증명이 그대로 있네요. API_KEY = 'sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV' 이건 .env 로 빼주세요. 그리고 send_email(to='customer.report@bizmail.com') 호출에서 실제 고객 메일이 하드코딩됐어요. 주석에 '담당: 류현진 010-1010-2020' 도 지워주시고요. DB_PASSWORD=devpass2024! 도 위험합니다. 함수명 get_user_rrn() 는 괜찮은데 리턴값 로깅은 빼주세요. 변수 order_id=ORD-2024-0613 는 유지. 전반적으로 LGTM, 위 5개만 수정 부탁해요.
+
+GROUND TRUTH (5): API_KEY=sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV, EMAIL=customer.report@bizmail.com, PERSON=류현진, PHONE=010-1010-2020, PASSWORD=devpass2024!
+TRAPS (탐지되면 오탐): get_user_rrn(), ORD-2024-0613, config.py
+
+RAW DETECTIONS (11):
+  · PERSON         [TOKENIZE_ROUNDTRIP] 'API_KEY'
+  · API_KEY        [BLOCK] 'sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] "send_email(to='customer.report@bizmail.com"
+  · PERSON         [TOKENIZE_ROUNDTRIP] '주석'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '류현진'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-1010-2020'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'DB_PASSWORD'
+  · PASSWORD       [BLOCK] 'devpass2024!'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '리턴값'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '로깅'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'LGTM'
+
+✅ 검출 TP (4):
+  · API_KEY        'sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV'
+  · PERSON         '류현진'
+  · PHONE          '010-1010-2020'
+  · PASSWORD       'devpass2024!'
+❌ 미검출 FN (1):
+  · EMAIL          'customer.report@bizmail.com'
+⚠️  오탐 후보 FP (7):
+  · PERSON         'API_KEY'
+  · ORGANIZATION   "send_email(to='customer.report@bizmail.com"
+  · PERSON         '주석'
+  · ORGANIZATION   'DB_PASSWORD'
+  · PERSON         '리턴값'
+  · PERSON         '로깅'
+  · ORGANIZATION   'LGTM'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[19] 동호회 회원 명부
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  테니스 동호회 신규 회원 명단 공유합니다. 1. 서지호 010-1122-3344 서울 노원구 동일로 1414. 2. 문가영 010-5566-1122 경기 고양시 일산동구 중앙로 1275. 3. 백승호 010-9988-7766. 회비 입금은 회장 계좌 신한 110-123456-78901 로 부탁드립니다. 단체 카톡방 초대는 가입 신청서의 이메일 주소로 보냅니다. 서지호 님은 jiho.seo@gmail.com 이고요. 다음 정기 모임은 6월 22일 오전 9시, 양재 시민의 숲 코트입니다.
+
+GROUND TRUTH (10): PERSON=서지호, PHONE=010-1122-3344, ADDRESS=서울 노원구 동일로 1414, PERSON=문가영, PHONE=010-5566-1122, ADDRESS=경기 고양시 일산동구 중앙로 1275, PERSON=백승호, PHONE=010-9988-7766, KR_ACCOUNT=110-123456-78901, EMAIL=jiho.seo@gmail.com
+
+RAW DETECTIONS (9):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '서지호'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-1122-3344'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 노원구 동일로 1414. 2. 문가영 010-5566-1122 경기 고양시 일산동구 중앙로 1275'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '백승호'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-9988-7766'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '110-123456-78901'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '서지호'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'jiho.seo@gmail.com'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '양재'
+
+✅ 검출 TP (7):
+  · PERSON         '서지호'
+  · PHONE          '010-1122-3344'
+  · ADDRESS        '서울 노원구 동일로 1414'
+  · PERSON         '백승호'
+  · PHONE          '010-9988-7766'
+  · KR_ACCOUNT     '110-123456-78901'
+  · EMAIL          'jiho.seo@gmail.com'
+❌ 미검출 FN (3):
+  · PERSON         '문가영'
+  · PHONE          '010-5566-1122'
+  · ADDRESS        '경기 고양시 일산동구 중앙로 1275'
+⚠️  오탐 후보 FP (2):
+  · PERSON         '서지호'
+  · ADDRESS        '양재'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[20] 수출 통관 서류
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  수출 신고 건 정리합니다. 수출자 상호 한빛무역, 사업자등록번호 887-13-78905. 담당자 오지환, 연락처 010-3434-5656, 이메일 jihwan.oh@hanbit.co.kr. 수입자는 미국 바이어 Mike Brown. 선적 항구는 부산항. 결제 조건 T/T, 대금 수취 계좌 외환 123456-78-901234. 컨테이너 번호 ABCU-1234567. 인보이스 금액 USD 52,000. HS 코드는 8517.12 입니다. 통관 예정일 6월 18일.
+
+GROUND TRUTH (6): ORGANIZATION=한빛무역, BIZ_NO=887-13-78905, PERSON=오지환, PHONE=010-3434-5656, EMAIL=jihwan.oh@hanbit.co.kr, KR_ACCOUNT=123456-78-901234
+TRAPS (탐지되면 오탐): ABCU-1234567, 8517.12, USD 52,000
+
+RAW DETECTIONS (10):
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '한빛무역'
+  · BIZ_NO         [TOKENIZE_ROUNDTRIP] '887-13-78905'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '오지환'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-3434-5656'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'jihwan.oh@hanbit.co.kr'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '미국'
+  · PERSON         [TOKENIZE_ROUNDTRIP] 'Mike Brown'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '부산항'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '123456-78-901234'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'HS'
+
+✅ 검출 TP (5):
+  · BIZ_NO         '887-13-78905'
+  · PERSON         '오지환'
+  · PHONE          '010-3434-5656'
+  · EMAIL          'jihwan.oh@hanbit.co.kr'
+  · KR_ACCOUNT     '123456-78-901234'
+❌ 미검출 FN (1):
+  · ORGANIZATION   '한빛무역'
+⚠️  오탐 후보 FP (5):
+  · ADDRESS        '한빛무역'
+  · ADDRESS        '미국'
+  · PERSON         'Mike Brown'
+  · ADDRESS        '부산항'
+  · ORGANIZATION   'HS'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[21] 민원 접수 (관공서)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  도로 보수 민원 접수합니다. 민원인 강도영, 연락처 010-6767-8989. 주소는 세종특별자치시 한누리대로 2130 입니다. 주민번호 920723-1641620 으로 본인인증 완료. 민원 회신은 문자 또는 이메일 doyoung.kang@korea.kr 로 받기 원하십니다. 현장은 아파트 정문 앞 도로 파임. 사진 3장 첨부. 접수번호 2024-MIN-00913. 처리 기한은 14일 이내입니다. 담당 부서는 도로과.
+
+GROUND TRUTH (5): PERSON=강도영, PHONE=010-6767-8989, ADDRESS=세종특별자치시 한누리대로 2130, RRN=920723-1641620, EMAIL=doyoung.kang@korea.kr
+TRAPS (탐지되면 오탐): 2024-MIN-00913
+
+RAW DETECTIONS (5):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '강도영'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-6767-8989'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '세종특별자치시 한누리대로 2130'
+  · RRN            [BLOCK] '920723-1641620'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'doyoung.kang@korea.kr'
+
+✅ 검출 TP (5):
+  · PERSON         '강도영'
+  · PHONE          '010-6767-8989'
+  · ADDRESS        '세종특별자치시 한누리대로 2130'
+  · RRN            '920723-1641620'
+  · EMAIL          'doyoung.kang@korea.kr'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (0):
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[22] 스타트업 투자 메모 (혼합 영문)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  시드 라운드 검토 노트입니다. 대표 Kevin Park(박준혁), 연락처 010-2020-3030. 회사는 클라우드비전, 사업자번호 469-80-91148. pitch deck는 kevin@cloudvision.io 로 받았습니다. 은행 계좌(에스크로) 하나 1002-345-678901. 법인 주소 서울 강남구 테헤란로 521. 기술 데모 서버 접속 토큰 AKIAIOSFODNN7EXAMPLE 이 메일에 그대로 와서 보안 지적했습니다. 밸류에이션 80억, 지분 12% 협의 중. 다음 미팅 6월 19일.
+
+GROUND TRUTH (8): PERSON=박준혁, PHONE=010-2020-3030, ORGANIZATION=클라우드비전, BIZ_NO=469-80-91148, EMAIL=kevin@cloudvision.io, KR_ACCOUNT=1002-345-678901, ADDRESS=서울 강남구 테헤란로 521, AWS_SECRET=AKIAIOSFODNN7EXAMPLE
+TRAPS (탐지되면 오탐): 80억, 12%
+
+RAW DETECTIONS (10):
+  · PERSON         [TOKENIZE_ROUNDTRIP] 'Kevin Park'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '박준혁'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-2020-3030'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '클라우드비전'
+  · BIZ_NO         [TOKENIZE_ROUNDTRIP] '469-80-91148'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'kevin@cloudvision.io'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '에스크'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '1002-345-678901'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 강남구 테헤란로 521'
+  · AWS_SECRET     [BLOCK] 'AKIAIOSFODNN7EXAMPLE'
+
+✅ 검출 TP (8):
+  · PERSON         '박준혁'
+  · PHONE          '010-2020-3030'
+  · ORGANIZATION   '클라우드비전'
+  · BIZ_NO         '469-80-91148'
+  · EMAIL          'kevin@cloudvision.io'
+  · KR_ACCOUNT     '1002-345-678901'
+  · ADDRESS        '서울 강남구 테헤란로 521'
+  · AWS_SECRET     'AKIAIOSFODNN7EXAMPLE'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (2):
+  · PERSON         'Kevin Park'
+  · ORGANIZATION   '에스크'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[23] 졸업생 추천서
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  추천서를 작성합니다. 학생 윤하린은 2024년 우리 학과를 졸업한 우수한 인재입니다. 현재 연락처는 010-7878-9090, 이메일 harin.yoon@univ.ac.kr 입니다. 재학 중 LG전자 인턴십을 성실히 수행했고, 거주지는 서울 관악구 관악로 1 입니다. 추천인 본인은 컴퓨터공학과 정교수 한석규이며, 연구실 내선으로 문의 가능합니다. 학점은 4.2/4.5, 졸업 작품은 수상 이력이 있습니다. 추가 문의 환영합니다.
+
+GROUND TRUTH (6): PERSON=윤하린, PHONE=010-7878-9090, EMAIL=harin.yoon@univ.ac.kr, ORGANIZATION=LG전자, ADDRESS=서울 관악구 관악로 1, PERSON=한석규
+TRAPS (탐지되면 오탐): 4.2/4.5, 2024년
+
+RAW DETECTIONS (5):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '윤하린'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-7878-9090'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'harin.yoon@univ.ac.kr'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'LG전자'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 관악구 관악로 1'
+
+✅ 검출 TP (5):
+  · PERSON         '윤하린'
+  · PHONE          '010-7878-9090'
+  · EMAIL          'harin.yoon@univ.ac.kr'
+  · ORGANIZATION   'LG전자'
+  · ADDRESS        '서울 관악구 관악로 1'
+❌ 미검출 FN (1):
+  · PERSON         '한석규'
+⚠️  오탐 후보 FP (0):
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[24] 중고거래 채팅
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  안녕하세요 아이폰 판매글 보고 연락드려요. 직거래 가능하실까요? 저는 신도림역 근처 살아요. 혹시 안 되면 택배도 괜찮아요. 받는 주소 알려드릴게요. 서울 구로구 경인로 662, 받는사람 임수호, 연락처 010-4321-8765 입니다. 입금은 카카오뱅크 3333-02-7654321 로 할게요. 이메일은 sooho.lim@gmail.com. 혹시 영수증 필요하면 말씀해주세요. 네고는 살짝만 부탁드려요. 물건 상태 좋아 보이네요. 내일 오후에 거래 가능합니다.
+
+GROUND TRUTH (5): ADDRESS=서울 구로구 경인로 662, PERSON=임수호, PHONE=010-4321-8765, KR_ACCOUNT=3333-02-7654321, EMAIL=sooho.lim@gmail.com
+TRAPS (탐지되면 오탐): 신도림역
+
+RAW DETECTIONS (8):
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '신도림역'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 구로구 경인로 662'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '임수호'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-4321-8765'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '카카오뱅크'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '02-7654321'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'sooho.lim@gmail.com'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '네고'
+
+✅ 검출 TP (4):
+  · ADDRESS        '서울 구로구 경인로 662'
+  · PERSON         '임수호'
+  · PHONE          '010-4321-8765'
+  · EMAIL          'sooho.lim@gmail.com'
+❌ 미검출 FN (1):
+  · KR_ACCOUNT     '3333-02-7654321'
+⚠️  오탐 후보 FP (4):
+  · ADDRESS        '신도림역'  [TRAP-확정오탐]
+  · ORGANIZATION   '카카오뱅크'
+  · PHONE          '02-7654321'
+  · PERSON         '네고'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[25] 급여 명세 발송
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  6월 급여명세서 발송합니다. 직원 성명 조민서, 사번 EMP-0312. 실수령액 320만원. 급여 이체 계좌는 국민 123456-78-901234 입니다. 4대보험 정산 위해 주민번호 770123-4279267 확인했습니다. 명세서 PDF는 minseo.cho@corp.com 으로 발송. 문의는 인사팀 010-1357-2468. 주소지 변경 있으시면 알려주세요, 현재 등록은 경기 수원시 영통구 광교중앙로 145. 연말정산 자료는 12월에 별도 안내드립니다.
+
+GROUND TRUTH (6): PERSON=조민서, KR_ACCOUNT=123456-78-901234, RRN=770123-4279267, EMAIL=minseo.cho@corp.com, PHONE=010-1357-2468, ADDRESS=경기 수원시 영통구 광교중앙로 145
+TRAPS (탐지되면 오탐): EMP-0312, 320만원
+
+RAW DETECTIONS (6):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '조민서'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '123456-78-901234'
+  · RRN            [BLOCK] '770123-4279267'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'minseo.cho@corp.com'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-1357-2468'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '경기 수원시 영통구 광교중앙로 145'
+
+✅ 검출 TP (6):
+  · PERSON         '조민서'
+  · KR_ACCOUNT     '123456-78-901234'
+  · RRN            '770123-4279267'
+  · EMAIL          'minseo.cho@corp.com'
+  · PHONE          '010-1357-2468'
+  · ADDRESS        '경기 수원시 영통구 광교중앙로 145'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (0):
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[26] 여행 예약 확정
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  제주 여행 예약 확정 안내드립니다. 대표 예약자 손흥민, 동반 1인. 연락처 010-7000-8000. 항공권 발권 위해 여권번호 M12345678 등록 완료. 숙소는 제주 서귀포시 중문관광로 72 호텔. 체크인 6월 20일. 결제 카드 4111-1111-1111-1111 승인. 예약 확인 메일은 heungmin.son@gmail.com 으로 발송했습니다. 렌터카는 H사 SUV, 보험 포함. 예약번호 JEJU-240613-22. 즐거운 여행 되세요!
+
+GROUND TRUTH (6): PERSON=손흥민, PHONE=010-7000-8000, PASSPORT=M12345678, ADDRESS=제주 서귀포시 중문관광로 72, CARD=4111-1111-1111-1111, EMAIL=heungmin.son@gmail.com
+TRAPS (탐지되면 오탐): JEJU-240613-22
+
+RAW DETECTIONS (8):
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '제주'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '손흥민'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-7000-8000'
+  · PASSPORT       [BLOCK] 'M12345678'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '제주 서귀포시 중문관광로 72'
+  · CARD           [BLOCK] '4111-1111-1111-1111'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'heungmin.son@gmail.com'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '렌터카'
+
+✅ 검출 TP (6):
+  · PERSON         '손흥민'
+  · PHONE          '010-7000-8000'
+  · PASSPORT       'M12345678'
+  · ADDRESS        '제주 서귀포시 중문관광로 72'
+  · CARD           '4111-1111-1111-1111'
+  · EMAIL          'heungmin.son@gmail.com'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (2):
+  · ADDRESS        '제주 서귀포시 중문관광로 72'
+  · ORGANIZATION   '렌터카'
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[27] 전세 대출 상담 (민감 집약)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  전세자금대출 상담 기록입니다. 신청인 김연아, 주민등록번호 760312-2345671. 재직 회사 현대자동차, 연소득 6천만원. 연락처 010-2468-1357, 이메일 yuna.kim@hmail.com. 임차 주소 서울 송파구 백제고분로 50. 기존 거래 계좌 신한 110-123456-78901. 결혼 예정으로 배우자 이상화도 공동 명의 검토. 대출 한도는 심사 후 안내. 운전면허 11-19-123456-01 사본 제출 완료. 상담사 박명수, 사번 0913.
+
+GROUND TRUTH (10): PERSON=김연아, RRN=760312-2345671, ORGANIZATION=현대자동차, PHONE=010-2468-1357, EMAIL=yuna.kim@hmail.com, ADDRESS=서울 송파구 백제고분로 50, KR_ACCOUNT=110-123456-78901, PERSON=이상화, DRIVER_LICENSE=11-19-123456-01, PERSON=박명수
+TRAPS (탐지되면 오탐): 6천만원, 0913
+
+RAW DETECTIONS (8):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '김연아'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '현대자동차'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-2468-1357'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'yuna.kim@hmail.com'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 송파구 백제고분로 50'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '110-123456-78901'
+  · DRIVER_LICENSE [BLOCK] '11-19-123456-01'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '박명수'
+
+✅ 검출 TP (8):
+  · PERSON         '김연아'
+  · ORGANIZATION   '현대자동차'
+  · PHONE          '010-2468-1357'
+  · EMAIL          'yuna.kim@hmail.com'
+  · ADDRESS        '서울 송파구 백제고분로 50'
+  · KR_ACCOUNT     '110-123456-78901'
+  · DRIVER_LICENSE '11-19-123456-01'
+  · PERSON         '박명수'
+❌ 미검출 FN (2):
+  · RRN            '760312-2345671'
+  · PERSON         '이상화'
+⚠️  오탐 후보 FP (0):
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[28] AI 챗봇 대화 로그 (은연중 유출)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  사용자: 내 정보로 자기소개서 좀 다듬어줘. 이름은 한예슬이고 1995년생, 이메일 yeseul.han@gmail.com 으로 연락 와. 사는 곳은 서울 동작구 사당로 300 이고 전화는 010-1199-2288 이야. 전 직장은 SK하이닉스였어. 아 그리고 회사 노트북 비번이 password=Hanyeseul2024! 인데 이것도 어디 적어두면 편할까? 다음 주 면접 회사는 쿠팡이야. 긴장된다. 경력 5년차로 정리해줘. 고마워!
+
+GROUND TRUTH (7): PERSON=한예슬, EMAIL=yeseul.han@gmail.com, ADDRESS=서울 동작구 사당로 300, PHONE=010-1199-2288, ORGANIZATION=SK하이닉스, PASSWORD=Hanyeseul2024!, ORGANIZATION=쿠팡
+TRAPS (탐지되면 오탐): 1995년생, 5년차
+
+RAW DETECTIONS (6):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '한예슬이고'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'yeseul.han@gmail.com'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 동작구 사당로 300'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-1199-2288'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'SK하이닉스였어'
+  · PASSWORD       [BLOCK] 'Hanyeseul2024!'
+
+✅ 검출 TP (6):
+  · PERSON         '한예슬'
+  · EMAIL          'yeseul.han@gmail.com'
+  · ADDRESS        '서울 동작구 사당로 300'
+  · PHONE          '010-1199-2288'
+  · ORGANIZATION   'SK하이닉스'
+  · PASSWORD       'Hanyeseul2024!'
+❌ 미검출 FN (1):
+  · ORGANIZATION   '쿠팡'
+⚠️  오탐 후보 FP (0):
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[29] 비표준 포맷 집중 (약점 노출)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  정보 정리: 담당자 노홍철(연락 010.3535.7979 — 점으로 구분). 백업 연락처는 02-555-1234 유선. 계좌는 우리 123-456-789012 (자주 쓰는 거). 사업자번호 1806341205 (하이픈 없이). 이메일 두 개: nono [at] example.com 과 real.email@example.com. 비밀번호는 그냥 '가나다1234!' 로 해놨어. 주소는 서울특별시 중구 세종대로 110. 카드 뒷자리만: 1111. 끝.
+
+GROUND TRUTH (6): PERSON=노홍철, PHONE=010.3535.7979, KR_ACCOUNT=123-456-789012, BIZ_NO=1806341205, EMAIL=real.email@example.com, ADDRESS=서울특별시 중구 세종대로 110
+TRAPS (탐지되면 오탐): 02-555-1234, nono [at] example.com, 1111
+
+RAW DETECTIONS (7):
+  · PERSON         [TOKENIZE_ROUNDTRIP] '노홍철'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010.3535.7979'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '02-555-1234'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '유선'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] 'example.com'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'real.email@example.com'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울특별시 중구 세종대로 110'
+
+✅ 검출 TP (4):
+  · PERSON         '노홍철'
+  · PHONE          '010.3535.7979'
+  · EMAIL          'real.email@example.com'
+  · ADDRESS        '서울특별시 중구 세종대로 110'
+❌ 미검출 FN (2):
+  · KR_ACCOUNT     '123-456-789012'
+  · BIZ_NO         '1806341205'
+⚠️  오탐 후보 FP (3):
+  · PHONE          '02-555-1234'  [TRAP-확정오탐]
+  · PERSON         '유선'
+  · ORGANIZATION   'example.com'  [TRAP-확정오탐]
+
+──────────────────────────────────────────────────────────────────────────────────────────
+[30] 복합 업무 메일 (총정리)
+──────────────────────────────────────────────────────────────────────────────────────────
+TEXT:
+  팀 공유: 신규 고객 온보딩 정보입니다. 회사 토스페이먼츠, 사업자 469-80-91148. 키맨 정해인 이사, 010-8421-7421, haein.jung@toss.im. 계약 보증금은 기업은행 123456-78-901234 로 수령. 기술 연동용 임시 API 키 sk-live9876543210ZYXWVUTSRQPONMLKJIH 를 발급했으니 운영 전 폐기하세요. 담당 개발 손나은, 주민번호 010809-2201058 은 보안서약서용으로만 받았습니다. 사무실 주소 서울 강남구 강남대로 382. 본 메일은 대외비입니다. 회신 바랍니다.
+
+GROUND TRUTH (10): ORGANIZATION=토스페이먼츠, BIZ_NO=469-80-91148, PERSON=정해인, PHONE=010-8421-7421, EMAIL=haein.jung@toss.im, KR_ACCOUNT=123456-78-901234, API_KEY=sk-live9876543210ZYXWVUTSRQPONMLKJIH, PERSON=손나은, RRN=010809-2201058, ADDRESS=서울 강남구 강남대로 382
+
+RAW DETECTIONS (11):
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '토스페이먼츠'
+  · BIZ_NO         [TOKENIZE_ROUNDTRIP] '469-80-91148'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '정해인'
+  · PHONE          [TOKENIZE_ROUNDTRIP] '010-8421-7421'
+  · EMAIL          [TOKENIZE_ROUNDTRIP] 'haein.jung@toss.im'
+  · ORGANIZATION   [TOKENIZE_ROUNDTRIP] '기업은행'
+  · KR_ACCOUNT     [TOKENIZE_ROUNDTRIP] '123456-78-901234'
+  · API_KEY        [BLOCK] 'sk-live9876543210ZYXWVUTSRQPONMLKJIH'
+  · PERSON         [TOKENIZE_ROUNDTRIP] '손나'
+  · RRN            [BLOCK] '010809-2201058'
+  · ADDRESS        [TOKENIZE_ROUNDTRIP] '서울 강남구 강남대로 382'
+
+✅ 검출 TP (10):
+  · ORGANIZATION   '토스페이먼츠'
+  · BIZ_NO         '469-80-91148'
+  · PERSON         '정해인'
+  · PHONE          '010-8421-7421'
+  · EMAIL          'haein.jung@toss.im'
+  · KR_ACCOUNT     '123456-78-901234'
+  · API_KEY        'sk-live9876543210ZYXWVUTSRQPONMLKJIH'
+  · PERSON         '손나은'
+  · RRN            '010809-2201058'
+  · ADDRESS        '서울 강남구 강남대로 382'
+❌ 미검출 FN (0):
+⚠️  오탐 후보 FP (1):
+  · ORGANIZATION   '기업은행'
+
+==========================================================================================
+집계
+==========================================================================================
+케이스: 30 · ground truth 항목: 204
+검출 TP: 185 · 미검출 FN: 19 · 오탐 FP: 49
+재현율(Recall) = TP/(TP+FN) = 185/204 = 0.907
+정밀도(Precision) = TP/(TP+FP) = 185/234 = 0.791
+
+카테고리별:
+  category           TP   FN   recall
+  ADDRESS            24    2     0.92
+  API_KEY             5    0     1.00
+  AWS_SECRET          2    0     1.00
+  BIZ_NO              6    1     0.86
+  CARD                6    0     1.00
+  DRIVER_LICENSE      3    0     1.00
+  EMAIL              25    1     0.96
+  FOREIGN_REG         1    0     1.00
+  GCP_KEY             1    0     1.00
+  KR_ACCOUNT         14    4     0.78
+  ORGANIZATION        8    3     0.73
+  PASSPORT            3    0     1.00
+  PASSWORD            4    1     0.80
+  PERSON             38    4     0.90
+  PHONE              34    1     0.97
+  PRIVATE_KEY         1    0     1.00
+  RRN                 9    2     0.82
+  TOKEN               1    0     1.00
