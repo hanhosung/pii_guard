@@ -4,9 +4,9 @@
 > `proximity.py`(양성), 정책 YAML `proximity:` 노출(`policy.py`, serve `--policy`). 30케이스 검증
 > 재현율 0.92→**0.95**, 정밀도 0.85→**0.94**, 전체 **2685 테스트 무회귀**.
 >
-> 상태: **제안(Proposal)** · 작성: 2026-06-23 · 대상: `pii_guard` 탐지 파이프라인
-> 짝 문서: [`../DESIGN.md`](../DESIGN.md)(as-built), [`../../validation/EFFICACY_REPORT.md`](../../validation/EFFICACY_REPORT.md)(검증 근거)
-> 본 문서는 **아직 구현 전**이다. 구현 후 결과를 §9 검증으로 입증하고 DESIGN.md에 반영한다.
+> 상태: **구현 완료(Implemented)** · 작성: 2026-06-23 · 대상: `pii_guard` 탐지 파이프라인
+> 짝 문서: [`../DESIGN.md`](../DESIGN.md)(as-built §6.5/6.6), [`../../validation/EFFICACY_REPORT.md`](../../validation/EFFICACY_REPORT.md)(검증 근거)
+> 본 문서는 원래 제안서이며 Phase 1·2·3로 구현 완료됨(상단 배너). **단, 음성 메커니즘은 §3.2/§5.2의 *스팬 사전 게이팅* 대신 `stage2/ner_filters.py`의 *NER 후필터*로 실현**됐다(더 정밀·오프셋 재매핑 불필요). 본문 §3~§10은 제안 당시 기록으로 보존한다.
 
 ---
 
