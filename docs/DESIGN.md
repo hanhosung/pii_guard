@@ -436,6 +436,77 @@ RedactionResult
 | ADR-6 | **serve NER default-on**(R14) | E2E 갭: 미연결 시 한국어 이름 평문 유출. |
 | ADR-7 | **`--log-masked` 관찰가능성**(R15), 원본 미출력 | 마스킹 검증 + no-raw-in-logs. |
 | **ADR-8 (DR-1)** | **LLM 기반 탐지 거부, 규칙+로컬 인코더 NER 유지** | 외부 LLM=P1위반·자기모순. 생성형 LLM=메모리·비결정성·**프롬프트 인젝션으로 탐지기 무력화**. 인코더 NER은 생성 안 해 인젝션 불가. |
+| **ADR-9** | **Stage2 PII 프레임워크 = Microsoft Presidio** | 완전 로컬 + PII 전용(정규식+NER+문맥+신뢰도 통합) + NLP엔진 교체 추상화 + 감사 설명가능성. 상세 §20.1. |
+| **ADR-10** | **Stage2 NLP 엔진 = spaCy 한국어 모델** | 8GB 메모리·속도·Presidio 네이티브 통합·비생성형(인젝션 불가)·시스템 의존 없음. 상세 §20.2. (변형 sm/lg 선택은 ADR-5) |
+
+---
+
+## 20.1 ADR-9 (상세) — Stage2 PII 탐지 프레임워크로 Microsoft Presidio 채택
+
+**맥락(Context).** Stage1(정규식·체크섬)이 못 잡는 **문맥 의존 PII**(이름·주소·조직)를 탐지할 엔진이 필요했다.
+단순 NER 모델만으로는 부족하다 — PII 탐지는 NER 결과를 **카테고리·신뢰도·문맥**으로 정리하고 정규식 인식기와
+통합하는 *프레임워크 레이어*가 필요하기 때문이다.
+
+**검토한 대안(Alternatives considered).**
+
+| 대안 | 종류 | 기각/비선택 사유 |
+| :-- | :-- | :-- |
+| AWS Comprehend PII · Google Cloud DLP · Azure | 클라우드 API | 🔴 **P1(로컬 우선) 정면 위반** — 탐지하려 PII를 클라우드로 전송 = 막으려는 유출을 자행(자기모순). 즉시 탈락. |
+| Nightfall · Private AI · Skyflow · BigID | 상용 | 유료, 외부 의존/온프렘 제약, 블랙박스. |
+| scrubadub | 경량 OSS | 정규식+얕은 NER만. 문맥 강화·신뢰도·확장성·언어 무관 NLP 엔진 부재. |
+| GLiNER / HuggingFace PII 모델 직접 사용 | 신경망 OSS | *프레임워크가 아님* — 정규식·체크섬·문맥·신뢰도·결정 프로세스를 직접 다 구현해야 함. 무거움. |
+| 자작(정규식만) | in-house | Stage1이 이미 담당. 문맥 PII 불가. |
+
+**결정(Decision).** **Microsoft Presidio**(`presidio-analyzer`/`presidio-anonymizer`)를 Stage2 프레임워크로 채택.
+
+**근거(Rationale).**
+1. **완전 로컬** — 가장 강력한 클라우드 PII 서비스는 P1 위반으로 자동 탈락. Presidio는 온프렘/로컬.
+2. **PII 전용 프레임워크** — 범용 NER이 아니라 *정규식 + deny-list + NER + 문맥 강화 + 신뢰도*를 이미 통합.
+3. **확장·추상화** — NLP 엔진 교체(spaCy→Stanza→transformer), 커스텀 recognizer/엔티티. 요구사항 §6.2의 모델 교체 슬롯과 합치.
+4. **언어 무관 설계** — `NlpEngineProvider` 설정만으로 한국어 모델 주입.
+5. **설명가능성** — 탐지별 신뢰도·decision process → Ledger 감사에 유리.
+6. 무료·성숙·MS 백업·활발한 커뮤니티.
+
+**적용(Implementation).** `stage2/korean_ner.py` — 기본 영어 recognizer를 모두 비활성화하고, `NlpEngineProvider`에
+한국어 spaCy 모델 주입 + `SpacyRecognizer(supported_language="ko", entities=[PERSON,LOCATION,ORGANIZATION])`로
+재구성. spaCy 라벨(PS/LC/OG)→Presidio 엔티티 매핑.
+
+**결과·트레이드오프(Consequences).** 의존성이 무겁고 기본 설정이 영어 중심이라 한국어 재구성이 필요 → 별도
+프로세스 + `[ner]` 옵션 설치로 **격리**(코어는 표준 라이브러리만, ADR-2와 정합).
+
+---
+
+## 20.2 ADR-10 (상세) — Stage2 NLP 엔진으로 spaCy 한국어 모델 채택
+
+**맥락(Context).** Presidio(ADR-9)에 꽂을 **NER 두뇌**가 필요했다. 핵심 제약: **타깃이 MacBook Air M2 8GB,
+메모리 예산 ~1~1.5GB**, 요청당 지연 예산(p50<200ms), 그리고 **비생성형**이어야 함(DR-1: 생성형은 프롬프트
+인젝션으로 탐지기가 무력화됨).
+
+**검토한 대안(Alternatives considered).**
+
+| 대안 | 정확도 | 메모리/속도 | 비선택 사유 |
+| :-- | :-- | :-- | :-- |
+| **HuggingFace transformer** (KoELECTRA·KLUE·KoBERT) | **최상(한국어 SOTA급)** | 🔴 수백MB~GB + PyTorch, 느림 | **8GB 메모리 예산 초과**. → 요구사항 §6.2가 명시한 *향후 업그레이드 경로*로 보류. |
+| **Stanza** (Stanford NLP) | 높음 | 무겁고 느림 | spaCy 대비 메모리·지연 불리. (Presidio 지원은 됨) |
+| **KoNLPy** (Mecab·Komoran·Okt·Kkma) | 형태소는 강하나 **NER 약함** | 중간 | 주 용도가 형태소·품사 분석. **Java/Mecab 시스템 설치** 필요 → 배포 복잡. |
+| **Mecab-ko** | NER 아님 | 가벼움 | 형태소 분석기 — 목적 불일치. |
+| 직접 학습 모델 | 도메인 최적 | 가변 | 학습 데이터·비용 大 (2차). |
+
+**결정(Decision).** **spaCy + 공식 한국어 파이프라인 `ko_core_news_lg`**(sm 폴백). 변형 sm/lg 선택은 ADR-5.
+
+**근거(Rationale).**
+1. **메모리(결정적)** — spaCy lg는 수백MB로 8GB 예산에 들어감. transformer는 GB급 → 초과.
+2. **속도** — Cython 기반으로 빠름, GPU 불필요 → 지연 예산 충족.
+3. **Presidio 네이티브 통합** — Presidio가 spaCy NLP 엔진을 1급 지원 → 깔끔한 결합.
+4. **시스템 의존 없음** — `ko_core_news_*`를 pip로 설치. KoNLPy류의 Java/Mecab 설치 불필요 → 배포 단순.
+5. **비생성형(인코더)** — 텍스트를 *분류*만 하고 *생성*하지 않음 → **프롬프트 인젝션 불가**(DR-1 핵심 근거).
+6. **공식 한국어 모델 존재** — 별도 학습 없이 PERSON/LOCATION/ORGANIZATION 인식.
+
+**적용(Implementation).** `resolve_ko_spacy_model()` — `PIIGUARD_KO_SPACY_MODEL` env > `lg` > `sm`. 조사
+스트리핑("홍길동은"→"홍길동")으로 플레이스홀더 매칭 정합.
+
+**결과·트레이드오프(Consequences).** 정확도 천장은 transformer보다 낮음(PERSON recall 0.84) → `KoreanNEREngine`
+추상화로 **모델 교체 슬롯**을 남겨, 더 높은 정확도가 필요하면 KoELECTRA/KLUE로 승급 가능(요구사항 §6.2·§23.4).
 
 ---
 
