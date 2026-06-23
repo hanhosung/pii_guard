@@ -180,7 +180,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 | `detector.py` | `scan_text(text)` | **Stage1 실행기.** `categories.py`의 모든 `CategorySpec` 패턴을 텍스트에 적용해 매치 수집, 체크섬 검증 통과분만 `Detection`으로 반환. `_resolve_capture_group`로 라벨형 패턴(예: "계좌번호: …")의 캡처 그룹만 정확히 스팬 지정. |
 | `categories.py` | `CategorySpec`, `PatternRule`, `_luhn_valid`·`_rrn_checksum`·`_kr_biz_checksum` | **18개 카테고리 정의의 단일 출처.** 각 `CategorySpec` = (카테고리명·`CategoryClass`·`Action`·`MaskStyle`·`min_confidence`·룰목록). `PatternRule` = (정규식 + 신뢰도 + 선택적 검증자). 검증자가 카드(Luhn)·주민번호·사업자번호의 **산술 유효성**을 확인해 오탐 억제. |
 | `models.py` | `Detection`, `RedactionResult`, `Action`·`CategoryClass`·`MaskStyle`·`DetectionStage` | **시스템 공용 데이터 타입.** `Detection`(스팬·카테고리·액션·placeholder_token·confidence·keyed_hash 등), `RedactionResult`(`redacted_text`, `detections`, `has_blocks`/`has_masks`, `coverage_gap`, `rehydrate()`). 모든 모듈이 이 타입으로 소통. |
-| `proximity.py` | `scan(text)`, `merge(base, extra)`, `ContextRule` | **Stage-1.5 양성 proximity**(context-gated). 모호한 정형 PII(비표준 계좌·맨 사업자번호·한글 비번)를 **트리거 키워드 근접 시에만 승격**. `merge`는 containment 정책(계좌가 전화 하위오탐 흡수). `STAGE1_PROXIMITY` 단계. |
+| `proximity.py` | `scan(text, config)`, `merge`, `ProximityConfig`, `build_rules` | **Stage-1.5 양성 proximity**(context-gated). 모호한 정형 PII(비표준 계좌·맨 사업자번호·한글 비번)를 **트리거 키워드 근접 시에만 승격**. 규칙은 `ProximityConfig`(정책 YAML 주입)에서 `build_rules`로 생성. `merge`는 containment 정책(계좌가 전화 하위오탐 흡수). `STAGE1_PROXIMITY` 단계. |
 | `masker.py` | `maskPayload`, `apply_redactions`, `rehydrate_text` | **순수 마스킹/복원 함수**(상태 없음). 탐지 스팬을 받아 텍스트를 `[CAT_N]`로 치환하거나 되돌림. 부수효과·세션 상태가 없어 테스트·재사용 용이. |
 | `vault.py` | `RequestVault`, `apply_mask_style` | **요청 스코프 마스킹 금고 + 마스크 스타일.** 한 요청 안에서 원본↔토큰 매핑을 보관하며, `tokenize`(기본)·`partial`(부분 가림)·`format_preserving`(형식 보존 더미) 스타일 적용(`_partial_mask`, `_format_preserving_mask`). |
 | `session_map.py` | `SessionMap` | **세션 일관성 매핑.** 같은 정규화 원본 → 항상 같은 토큰(LLM 문맥 유지). 양방향 조회(원본→토큰, 토큰→원본). **메모리에만** 존재, 디스크 미영속(P4). |
@@ -297,6 +297,19 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 ### 6.3 올바른 fast-path (요구사항 §6.3)
 - ❌ "Stage1 clean이면 NER 스킵"은 틀림(NER은 정규식이 놓친 걸 담당).
 - ✅ 콘텐츠 클래스 게이팅(자연어 스팬만 NER, 코드·base64·hex blob 스킵) + 블록 해시 캐시.
+- **as-built 주의**: 코드 텍스트 과잉 마스킹은 *스팬 게이팅* 대신 **NER 후필터**(§6.6)로 더 정밀하게 실현됨.
+
+### 6.5 Stage-1.5 — 양성 proximity (context-gated, R17)
+- `proximity.py`가 Stage1 직후 실행. 모호한 정형 PII를 **트리거 키워드가 근접할 때만 승격**:
+  - 비표준 계좌(3-3-6, 토스/카카오 4-2-7) ← 은행명/입금/계좌 근접
+  - 하이픈 없는 사업자번호(10자리) ← "사업자" 근접 + 체크섬
+  - 한글 라벨 비밀번호("비밀번호:") ← 키워드 패턴
+- `proximity.merge` **containment 정책**: 계좌가 내부 전화 하위오탐(`02-…`)을 흡수.
+- `STAGE1_PROXIMITY` 단계로 기록. 규칙 기반 → 결정적·인젝션 불가.
+
+### 6.6 NER 후필터 — 음성 proximity (R17)
+- `stage2/ner_filters.py`가 NER 탐지 중 **코드토큰·약어·base64 blob·일반명사**를 제거(**제거만** → recall-safe).
+- 정밀도 0.79→0.93. 정책으로 on/off·추가 deny-list 가능(§8).
 
 ### 6.4 NER 품질 (ko_core_news_lg, full-pipeline)
 | 엔티티 | precision | recall |
@@ -333,6 +346,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
   - `stage2_fail_action=mask_known_only`, `unscannable_action=block`, `unknown_field_action=block`
   - `rehydrate=True`, `memory_budget_mb=1024`, `egress_lockdown=False`
   - `categories{}`, `allowlist[]`, `pin_list[]`(+`pin_list_approved`), `channel_overrides{}`
+  - `proximity{}`(R17) — `enabled`, `window_chars`, `account_triggers[]`, `biz_triggers[]`, `password_keywords[]`, `ner_filter_enabled`, `ner_extra_stopwords[]`. → `ProximityConfig`로 파싱, `Engine(proximity_config=…)`에 주입(NER 필터 노브는 env로 Stage-2 서브프로세스 전파).
 - `decision.py::PolicyDecisionEngine` — 카테고리→액션 결정 + 실패 정책 해석.
 - **액션 의미**: `allow < mask < block`. mask는 구조 보존(`[CAT_N]`)이라 요약·코드생성 등 정상 동작.
 
@@ -419,8 +433,9 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 | `boundary [--json]` | 보호 경계 리포트 |
 | `pin-list ...` | out-of-band 승인 흐름 |
 
-**`serve` 기본값(R14·R15):**
+**`serve` 기본값(R14·R15·R17):**
 - NER **default-on**: `Engine(stage2_runner=Stage2NERRunner())`. `--no-ner`로만 비활성.
+- **`--policy PATH`**(R17): 정책 YAML을 로드해 `proximity:` 키워드/윈도우·NER필터 노브를 Engine에 연결. 생략 시 secure 기본값.
 - `--log-masked`: 업스트림 전송 직전 **마스킹된 페이로드 + 탐지 요약(category→placeholder)**을 stdout 출력.
   - **원본 미출력** — `sanitized_payload`만 직렬화(no-raw-in-logs, Ledger와 동일 규율).
   - 차단 요청은 `✗ BLOCKED — NOT forwarded`로 표기.
@@ -448,7 +463,7 @@ Detection
   start, end: int             # 스팬
   original: str               # 원본 스팬(메모리 한정, 미영속)
   placeholder_token: str      # "[PERSON_1]"
-  detection_stage: DetectionStage  # STAGE1_REGEX_CHECKSUM | STAGE2_NER
+  detection_stage: DetectionStage  # STAGE1_REGEX_CHECKSUM | STAGE1_PROXIMITY | STAGE2_NER
   rule_id, confidence, keyed_hash, char_class_signature, span_length
 
 RedactionResult
@@ -464,13 +479,14 @@ RedactionResult
 
 ## 17. 테스트 전략
 
-- **39개 테스트 파일 / 2640 passed / 12 skipped / 0 failed** (`.venv` + ko_core_news_lg).
+- **42개 테스트 파일 / 2685 passed / 12 skipped / 0 failed** (`.venv` + ko_core_news_lg).
 - 계층:
   - 단위: 카테고리·마스커·세션맵·정책·Ledger·복원·파서·트립와이어·스트리밍·NER 엔진.
   - 와이어: `test_{claude,openai,gemini}_wire.py` — 프로바이더 포맷 스크럽.
   - 통합: `test_pipeline_integration.py`, `test_serve_ner_wiring.py`(R14 회귀), `test_log_masked.py`(R15).
+  - proximity(R17): `test_proximity.py`·`test_ner_filters.py`·`test_proximity_policy.py`(키워드 정책 노출).
   - **E2E**: `scripts/e2e_smoke.py` — 실제 `serve` 서브프로세스 + mock 업스트림으로 MASK/BLOCK/REHYDRATE 검증.
-  - 효능: `test_korean_pii_corpus/regression`, `test_ner_benchmark`, `benchmarks/korean_ner_benchmark.py`(precision/recall 게이트).
+  - 효능: `test_korean_pii_corpus/regression`, `test_ner_benchmark`, `benchmarks/korean_ner_benchmark.py`(precision/recall 게이트). 30케이스 실효성 = `validation/efficacy_test.py`.
   - 실패: `test_fail_closed`, `test_crash_fail_closed`, `test_stage2_degradation`.
   - 12 skip = root+pf(4)+실네트워크 필요한 egress 통합(`-m integration`) — **미실행(§19 한계)**.
 - **합성 데이터만**(실 PII 금지). 체크섬 유효한 가짜 한국 포맷 픽스처.
