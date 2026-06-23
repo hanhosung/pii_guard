@@ -269,7 +269,7 @@ ouroboros 본체(Python 3.14)와 별도로 **Stage2(Presidio+spaCy+PyTorch)는 P
   - → 무효 번호(랜덤 숫자열)를 걸러 **오탐(FP)을 크게 줄인다.** (그래서 §23.3의 "라벨 없는 비표준 계좌"처럼 일부는 일부러 안 잡힘.)
 - **성격**: **결정적·재현 가능**(같은 입력은 항상 같은 결과) → 감사·테스트에 유리, **프롬프트 인젝션 불가**.
 - **경량·상주**: 코어 프로세스 안에서 항상 돈다(모델 로딩 불필요).
-- **구현**: `detector.py` + `categories.py`(18개 카테고리 패턴·체크섬).
+- **구현**: `detector.py` + `categories.py`(20개 카테고리 패턴·체크섬).
 
 ### 6.2 Stage 2 — 문맥 탐지 (Presidio + 한국어 spaCy, 타임아웃 인라인)
 
@@ -300,7 +300,8 @@ ouroboros 본체(Python 3.14)와 별도로 **Stage2(Presidio+spaCy+PyTorch)는 P
 | **시크릿/크리덴셜** `API_KEY, AWS_SECRET, GCP_KEY, TOKEN(JWT), PRIVATE_KEY, PASSWORD` | `sk-…`, `ghp_…`, `-----BEGIN … KEY-----` | **block** |
 | **고위험 신원** `RRN(주민번호), FOREIGN_REG(외국인등록), PASSPORT, DRIVER_LICENSE, CARD` | 900101-1234567 | **block** |
 | **연락/식별** `EMAIL, PHONE, KR_ACCOUNT(계좌), BIZ_NO(사업자)` | 010-1234-5678 | **mask** |
-| **문맥(NER)** `PERSON, ADDRESS` | 홍길동, 도로명주소 | **mask** |
+| **문맥(NER)** `PERSON, ADDRESS, ORGANIZATION` | 홍길동, 도로명주소, 삼성전자 | **mask** |
+| **서버 토폴로지** `IP_ADDRESS(IPv4), HOSTNAME(내부)` | 10.0.12.45, prod-api-01.internal | **mask** |
 | **저위험** `DOB(생년월일)` | 1990-01-01 | **allow** |
 
 - PII와 시크릿은 같은 메커니즘이되 카테고리 분리. **한국 특화 항목은 1급 카테고리.**
@@ -647,7 +648,7 @@ acceptance_criteria:
 
 ### 23.5 as-built 요약
 
-- **18개 카테고리**(시크릿 6·고위험신원 5·연락식별 4·문맥NER 3) — §7 카탈로그 구현 완료.
+- **20개 카테고리**(시크릿 6·고위험신원 5·연락식별 4·문맥NER 3·서버정보 2) — §7 카탈로그 구현 완료.
 - **43개 모듈** / **42개 테스트 파일** / **2685 passed, 12 skipped, 0 failed**(`.venv` + lg 기준).
 - 구현 모듈 구조는 §3.2의 계획(`core/ detectors/ …` 중첩)과 달리 **평면 `pii_guard/` 패키지**로 수렴 — DESIGN.md §4 모듈맵 참조.
 - MVP(§19 1차) **전 항목 구현**. 2차(egress 락다운·hwp/OCR·proxy_held·transformer NER·서명 자동갱신)는 미착수.

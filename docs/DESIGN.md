@@ -178,7 +178,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 | :-- | :-- | :-- |
 | `engine.py` | `Engine`, `Engine.scan(text)→RedactionResult` | **탐지 오케스트레이터이자 공용 진입점.** ① `detector.scan_text()`로 Stage1 실행 → ② 생성자에 `stage2_runner`가 있으면 `runner.scan(text, stage1_dets)`로 Stage2 위임 → ③ 두 결과를 병합해 `RedactionResult` 생성. Stage2 실패 시 `coverage_gap=True`·`stage2_gap_reason` 설정. 프록시·CLI·UI·테스트가 **같은 `Engine`을 재사용**(요구사항 §3.2). |
 | `detector.py` | `scan_text(text)` | **Stage1 실행기.** `categories.py`의 모든 `CategorySpec` 패턴을 텍스트에 적용해 매치 수집, 체크섬 검증 통과분만 `Detection`으로 반환. `_resolve_capture_group`로 라벨형 패턴(예: "계좌번호: …")의 캡처 그룹만 정확히 스팬 지정. |
-| `categories.py` | `CategorySpec`, `PatternRule`, `_luhn_valid`·`_rrn_checksum`·`_kr_biz_checksum` | **18개 카테고리 정의의 단일 출처.** 각 `CategorySpec` = (카테고리명·`CategoryClass`·`Action`·`MaskStyle`·`min_confidence`·룰목록). `PatternRule` = (정규식 + 신뢰도 + 선택적 검증자). 검증자가 카드(Luhn)·주민번호·사업자번호의 **산술 유효성**을 확인해 오탐 억제. |
+| `categories.py` | `CategorySpec`, `PatternRule`, `_luhn_valid`·`_rrn_checksum`·`_kr_biz_checksum` | **20개 카테고리 정의의 단일 출처.** 각 `CategorySpec` = (카테고리명·`CategoryClass`·`Action`·`MaskStyle`·`min_confidence`·룰목록). `PatternRule` = (정규식 + 신뢰도 + 선택적 검증자). 검증자가 카드(Luhn)·주민번호·사업자번호의 **산술 유효성**을 확인해 오탐 억제. |
 | `models.py` | `Detection`, `RedactionResult`, `Action`·`CategoryClass`·`MaskStyle`·`DetectionStage` | **시스템 공용 데이터 타입.** `Detection`(스팬·카테고리·액션·placeholder_token·confidence·keyed_hash 등), `RedactionResult`(`redacted_text`, `detections`, `has_blocks`/`has_masks`, `coverage_gap`, `rehydrate()`). 모든 모듈이 이 타입으로 소통. |
 | `proximity.py` | `scan(text, config)`, `merge`, `ProximityConfig`, `build_rules` | **Stage-1.5 양성 proximity**(context-gated). 모호한 정형 PII(비표준 계좌·맨 사업자번호·한글 비번)를 **트리거 키워드 근접 시에만 승격**. 규칙은 `ProximityConfig`(정책 YAML 주입)에서 `build_rules`로 생성. `merge`는 containment 정책(계좌가 전화 하위오탐 흡수). `STAGE1_PROXIMITY` 단계. |
 | `masker.py` | `maskPayload`, `apply_redactions`, `rehydrate_text` | **순수 마스킹/복원 함수**(상태 없음). 탐지 스팬을 받아 텍스트를 `[CAT_N]`로 치환하거나 되돌림. 부수효과·세션 상태가 없어 테스트·재사용 용이. |
@@ -277,7 +277,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 ## 6. 탐지 파이프라인
 
 ### 6.1 Stage 1 — 결정적 (인프로세스, 동기)
-- `detector.py`가 `categories.py`의 18개 `CategorySpec`을 적용.
+- `detector.py`가 `categories.py`의 20개 `CategorySpec`을 적용.
 - 각 카테고리 = 정규식 패턴 + (옵션)**체크섬 검증자**:
   - RRN: 13자리 가중합 체크섬 (`_rrn_checksum`)
   - CARD: Luhn
@@ -502,6 +502,7 @@ RedactionResult
 | PII (고위험) | DRIVER_LICENSE, CARD | **block** |
 | PII / KOREAN_PII (연락·식별) | EMAIL, PHONE, BIZ_NO, KR_ACCOUNT | **mask**(tokenize_roundtrip) |
 | PII / KOREAN_PII (문맥 NER) | PERSON, ADDRESS, ORGANIZATION | **mask**(tokenize_roundtrip) |
+| PII (서버 토폴로지) | IP_ADDRESS(IPv4), HOSTNAME(내부 TLD FQDN) | **mask**(tokenize_roundtrip) |
 
 (18개. `CategoryClass` = PII | KOREAN_PII | SECRET. 사용자 커스텀 카테고리 확장 가능.)
 

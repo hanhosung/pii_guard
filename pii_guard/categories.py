@@ -237,6 +237,41 @@ ORGANIZATION = CategorySpec(
     detection_stage=DetectionStage.STAGE2_NER,
 )
 
+# ── IP_ADDRESS — server topology (IPv4) ───────────────────────────────────────
+# Strict octet validation (each 0-255); lookarounds prevent matching inside a
+# longer dotted run. Masks internal AND public IPv4 so server/client network
+# identifiers don't leak to an external LLM during log analysis.
+_OCTET = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
+_IPV4_PATTERN = re.compile(
+    rf"(?<![\d.])(?:{_OCTET}\.){{3}}{_OCTET}(?![\d.])"
+)
+IP_ADDRESS = CategorySpec(
+    category="IP_ADDRESS",
+    category_class=CategoryClass.PII,
+    action=Action.TOKENIZE_ROUNDTRIP,
+    mask_style=MaskStyle.TOKENIZE,
+    min_confidence=0.80,
+    rules=[PatternRule("ipv4", _IPV4_PATTERN, 0.85)],
+)
+
+# ── HOSTNAME — internal server hostnames (FQDN with internal TLD) ──────────────
+# Conservative: only FQDNs ending in an internal-network TLD (internal/local/
+# corp/lan/intranet/cluster.local) — public domains (gmail.com, api.anthropic.com)
+# are deliberately NOT matched so legitimate external references stay intact.
+_HOSTNAME_PATTERN = re.compile(
+    r"\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+"
+    r"(?:internal|local|corp|lan|intranet)\b",
+    re.IGNORECASE,
+)
+HOSTNAME = CategorySpec(
+    category="HOSTNAME",
+    category_class=CategoryClass.PII,
+    action=Action.TOKENIZE_ROUNDTRIP,
+    mask_style=MaskStyle.TOKENIZE,
+    min_confidence=0.80,
+    rules=[PatternRule("hostname_internal", _HOSTNAME_PATTERN, 0.85)],
+)
+
 # ── RRN — Korean Resident Registration Number ─────────────────────────────────
 # Format: YYMMDD-NNNNNNN   (7th digit 1-4 = Korean national, 5-8 = foreigner)
 # RRN uses digits 1-4 as 7th (block both but classify separately)
@@ -726,6 +761,9 @@ ALL_CATEGORIES: List[CategorySpec] = [
     KR_ACCOUNT,
     PERSON,
     ADDRESS,
+    # Server topology / network identifiers (mask)
+    IP_ADDRESS,
+    HOSTNAME,
     # Stage-2-only Korean categories (no Stage-1 rules; NER detection only)
     ORGANIZATION,
 ]
