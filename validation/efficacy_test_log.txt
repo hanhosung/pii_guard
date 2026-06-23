@@ -43,12 +43,13 @@ TEXT:
 GROUND TRUTH (5): AWS_SECRET=AKIAIOSFODNN7EXAMPLE, API_KEY=sk-abcdefghijklmnopqrstuvwxyz1234567890, API_KEY=ghp_1234567890abcdefghijklmnopqrstuvwxyz12, PASSWORD=Sup3rSecret!2024, PERSON=박지훈
 TRAPS (탐지되면 오탐): #1423, v2.3.1
 
-RAW DETECTIONS (5):
+RAW DETECTIONS (6):
   · AWS_SECRET     [BLOCK] 'AKIAIOSFODNN7EXAMPLE'
   · API_KEY        [BLOCK] 'sk-abcdefghijklmnopqrstuvwxyz1234567890'
   · API_KEY        [BLOCK] 'ghp_1234567890abcdefghijklmnopqrstuvwxyz12'
   · PASSWORD       [BLOCK] 'Sup3rSecret!2024'
   · PERSON         [TOKENIZE_ROUNDTRIP] '박지훈'
+  · HOSTNAME       [TOKENIZE_ROUNDTRIP] 'wiki.internal'
 
 ✅ 검출 TP (5):
   · AWS_SECRET     'AKIAIOSFODNN7EXAMPLE'
@@ -57,7 +58,8 @@ RAW DETECTIONS (5):
   · PASSWORD       'Sup3rSecret!2024'
   · PERSON         '박지훈'
 ❌ 미검출 FN (0):
-⚠️  오탐 후보 FP (0):
+⚠️  오탐 후보 FP (1):
+  · HOSTNAME       'wiki.internal'
 
 ──────────────────────────────────────────────────────────────────────────────────────────
 [03] 병원 접수 안내 이메일
@@ -905,9 +907,9 @@ RAW DETECTIONS (11):
 집계
 ==========================================================================================
 케이스: 30 · ground truth 항목: 204
-검출 TP: 192 · 미검출 FN: 12 · 오탐 FP: 26
+검출 TP: 192 · 미검출 FN: 12 · 오탐 FP: 27
 재현율(Recall) = TP/(TP+FN) = 192/204 = 0.941
-정밀도(Precision) = TP/(TP+FP) = 192/218 = 0.881
+정밀도(Precision) = TP/(TP+FP) = 192/219 = 0.877
 
 카테고리별:
   category           TP   FN   recall

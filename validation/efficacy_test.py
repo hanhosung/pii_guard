@@ -667,7 +667,7 @@ def generate_md(cases, per_cat, summary):
     def W(s=""):
         o.append(s)
 
-    W("# PII-Guard 실효성 검증 리포트")
+    W("# PII-Guard 실효성 검증 리포트 (Claude 자체 테스트)")
     W()
     W("> 생성: 자동화 하니스 `validation/efficacy_test.py` · 증거 로그: "
       "[`efficacy_test_log.txt`](./efficacy_test_log.txt)")
