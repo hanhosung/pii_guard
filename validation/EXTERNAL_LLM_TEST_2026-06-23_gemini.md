@@ -2,7 +2,7 @@
 
 > **입력**: Gemini가 `EXTERNAL_TEST_PROMPT.md` 규칙으로 생성한 **10건**(VOC 5 + 서버로그 5, ground truth 라벨 포함).
 > **방법**: `validation/load_external_test.py`로 PII-Guard(Stage1+Stage2 NER lg + proximity, 20 카테고리)에 입력해 채점.
-> **비교 대상**: [`EXTERNAL_LLM_TEST_2026-06-23.md`](./EXTERNAL_LLM_TEST_2026-06-23.md)(Codex, VOC-only) — 서로 다른 갭을 드러냄.
+> **비교 대상**: [`EXTERNAL_LLM_TEST_2026-06-23_codex.md`](./EXTERNAL_LLM_TEST_2026-06-23_codex.md)(Codex, VOC-only) — 서로 다른 갭을 드러냄.
 
 ---
 

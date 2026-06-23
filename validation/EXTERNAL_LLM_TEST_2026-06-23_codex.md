@@ -1,4 +1,4 @@
-# 외부 LLM 생성 테스트 결과 — PII-Guard 검출 (2026-06-23)
+# 외부 LLM(Codex) 생성 테스트 결과 — PII-Guard 검출 (2026-06-23)
 
 > **입력**: 다른 LLM(Codex 등)이 `EXTERNAL_TEST_PROMPT.md` 규칙으로 생성한 **VOC 10건**(고객센터 문의, ground truth 라벨 포함).
 > **방법**: `validation/load_external_test.py`로 PII-Guard(Stage1+Stage2 NER lg + proximity, 20 카테고리)에 입력해 채점.
