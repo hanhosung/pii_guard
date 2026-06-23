@@ -55,6 +55,7 @@ import json
 import re
 import socket
 import struct
+import sys
 import threading
 import urllib.error
 import urllib.request
@@ -207,10 +208,16 @@ class PIIGuardProxy:
         unscannable_action: str = "block",
         rehydrate_responses: bool = True,
         terminal_restore: bool = False,
+        log_masked: bool = False,
     ) -> None:
         self.upstream_url: str = upstream_url.rstrip("/")
         self.engine: Engine = engine if engine is not None else Engine()
         self._engine_lock = threading.Lock()
+        # When True, print the sanitised (masked) payload and a detection summary
+        # to stdout before forwarding — lets operators confirm that PII never
+        # leaves the host in the clear. Only the MASKED payload is logged; the
+        # raw request body is never written to the console (no-raw-in-logs).
+        self._log_masked = log_masked
         self._unknown_field_action = unknown_field_action
         self._unscannable_action = unscannable_action
         self._rehydrate_responses = rehydrate_responses
@@ -442,18 +449,69 @@ class PIIGuardProxy:
             # or the tripwire demands it (fail-closed on coverage gaps with
             # BLOCK-category PII).
             if scrub_result.should_block or tripwire_result.should_block:
+                self._log_traffic(path, provider, scrub_result,
+                                  tripwire_result, blocked=True)
                 self._send_response_bytes(
                     handler, 400, _BLOCKED_RESPONSE, _JSON_CONTENT_TYPE
                 )
                 return
 
             forwarded_payload = scrub_result.sanitized_payload
+            self._log_traffic(path, provider, scrub_result,
+                              tripwire_result, blocked=False)
         else:
             # Unknown/unrecognised path — pass through unchanged (no scrubbing)
             forwarded_payload = payload
 
         # ── 4. Forward to upstream ────────────────────────────────────────────
         self._forward(handler, path, forwarded_payload)
+
+    def _log_traffic(self, path, provider, scrub_result,
+                     tripwire_result, *, blocked: bool) -> None:
+        """
+        Print the sanitised (masked) outbound payload + a detection summary to
+        stdout, so operators can confirm — when calling the real upstream — that
+        PII is masked or the request is blocked before anything leaves the host.
+
+        Only the MASKED payload is logged; the original request body is never
+        written to the console.
+        """
+        if not self._log_masked:
+            return
+
+        # Collect detections from the structured scrubber's per-field events.
+        dets = []  # (category, action, placeholder)
+        for ev in getattr(scrub_result, "field_events", []) or []:
+            for d in getattr(ev, "detections", []) or []:
+                action = str(getattr(d, "action", "")).split(".")[-1]
+                dets.append((d.category, action, getattr(d, "placeholder_token", "")))
+
+        out = ["", "=" * 72]
+        verdict = "✗ BLOCKED — NOT forwarded (fail-closed)" if blocked \
+            else "→ FORWARD to upstream (masked)"
+        out.append(f"[PII-Guard] {verdict}")
+        out.append(f"  upstream : {self.upstream_url}{path}   (provider={provider})")
+        if dets:
+            out.append(f"  detections ({len(dets)}):")
+            for cat, action, ph in dets:
+                mark = "BLOCK" if action == "BLOCK" else "mask "
+                out.append(f"    [{mark}] {cat:<13} → {ph}")
+        else:
+            out.append("  detections: none")
+        if getattr(tripwire_result, "should_block", False):
+            out.append("  tripwire : BLOCK-category PII found in a non-standard field")
+        # The masked payload that is (or would have been) sent upstream.
+        try:
+            masked_json = json.dumps(
+                scrub_result.sanitized_payload, ensure_ascii=False, indent=2
+            )
+        except Exception:  # noqa: BLE001
+            masked_json = "<unserialisable>"
+        out.append("  masked payload (sent to upstream):" if not blocked
+                   else "  masked payload (withheld — shown for inspection):")
+        out.append("\n".join("    " + ln for ln in masked_json.splitlines()))
+        out.append("=" * 72)
+        print("\n".join(out), file=sys.stdout, flush=True)
 
     def _handle_pin_list_mutation(self, handler: BaseHTTPRequestHandler) -> None:
         """

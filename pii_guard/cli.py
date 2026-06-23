@@ -130,6 +130,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
         host=args.host,
         port=args.port,
         engine=engine,
+        log_masked=getattr(args, "log_masked", False),
     )
     proxy.start()
 
@@ -550,6 +551,16 @@ def build_parser() -> argparse.ArgumentParser:
             "disable Stage-2 Korean NER (run Stage-1 regex only). NER is ON by "
             "default so person names / addresses / organizations are masked; this "
             "flag is an escape hatch for minimal/low-resource deployments."
+        ),
+    )
+    serve_parser.add_argument(
+        "--log-masked",
+        action="store_true",
+        help=(
+            "print the masked payload + detection summary to stdout before "
+            "forwarding to the upstream (e.g. real Anthropic). Confirms PII is "
+            "masked/blocked before leaving the host. Only the MASKED payload is "
+            "logged — never the raw request body."
         ),
     )
     serve_parser.set_defaults(func=cmd_serve)
