@@ -26,8 +26,14 @@ from pii_guard.engine import Engine
 from pii_guard.stage2.runner import Stage2NERRunner
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LOG_PATH = os.path.join(HERE, "efficacy_test_log.txt")
-MD_PATH = os.path.join(HERE, "EFFICACY_REPORT.md")
+# Optional CLI arg: a label appended to the output filenames so a fresh run can
+# be captured to a new file without overwriting the canonical report.
+#   python validation/efficacy_test.py            → EFFICACY_REPORT.md
+#   python validation/efficacy_test.py _R17_rerun → EFFICACY_REPORT_R17_rerun.md
+import sys as _sys
+_LABEL = _sys.argv[1] if len(_sys.argv) > 1 else ""
+LOG_PATH = os.path.join(HERE, "efficacy_test_log.txt")   # canonical evidence log (fixed)
+MD_PATH = os.path.join(HERE, f"EFFICACY_REPORT{_LABEL}.md")  # report (labelable)
 
 SECRET_CATS = {"API_KEY", "AWS_SECRET", "GCP_KEY", "TOKEN", "PRIVATE_KEY", "PASSWORD"}
 
