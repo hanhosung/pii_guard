@@ -290,7 +290,23 @@ ouroboros 본체(Python 3.14)와 별도로 **Stage2(GLiNER+PyTorch 또는 Presid
 - **격리**: 무거운 모델은 **별도 워커 프로세스**(spawn)에서 돈다 → Stage2가 죽어도(OOM 등) 코어는 생존(§3.1). GLiNER가 더 무겁기 때문에 이 격리는 GLiNER 기본 채택의 전제다.
 - **워밍업(필수)**: GLiNER 콜드 로드(~14.4s)가 블록당 타임아웃(기본 10s)을 초과하면 매 요청이 degrade돼 이름·주소가 누출된다. `serve`는 시작 시 `Stage2NERRunner.warmup()`으로 모델을 **블록 타임아웃 밖**에서 1회 로드한 뒤 트래픽을 받는다. (검증 = `tests/test_ner_backend.py`)
 - **백엔드 성능 비교**(정탐/오탐/미탐 분류 포함) = [`validation/NER_BACKEND_COMPARISON.md`](../validation/NER_BACKEND_COMPARISON.md)
+- **신뢰도 임계값(`min_confidence`, 기본 0.50)** — 자세한 설명은 아래 박스. R20(§23.2)에서 이 값을 정책으로 노출하는 안을 다룬다.
 - **구현**: `stage2/gliner_ner.py`·`stage2/korean_ner.py`(백엔드 엔진) + `stage2/runner.py`(워커·타임아웃·열화, 백엔드 공통).
+
+> **📦 쉽게 — "신뢰도 임계값(confidence threshold)"이란?**
+>
+> NER 모델은 무언가를 찾을 때 단순히 "맞다/아니다"가 아니라 **확신 점수(0.0~1.0)**를 함께 낸다. 임계값은 그 점수의 **합격선(커트라인)**이다 — 점수가 임계값 이상인 것만 "진짜 탐지"로 인정한다.
+>
+> 예) 문장 "담당자 김철수" → 모델이 `김철수`=PERSON 점수 0.97, `담당자`=PERSON? 점수 0.32를 냈다면, 임계값 0.50에서 `김철수`(0.97≥0.50)는 채택, `담당자`(0.32<0.50)는 버린다.
+>
+> 임계값을 바꾸면 **놓침(recall) ↔ 헛잡음(precision)**이 맞바뀐다(검사 기준을 깐깐/느슨하게 잡는 것과 같다):
+>
+> | 임계값 | 동작 | 결과 |
+> | :-- | :-- | :-- |
+> | **낮춤**(예 0.50→0.35) | 애매한 것까지 채택(느슨) | **놓침↓(recall↑)**, 헛잡음↑(precision↓) |
+> | **높임**(예 0.50→0.70) | 확실한 것만 채택(깐깐) | 헛잡음↓(precision↑), 놓침↑(recall↓) |
+>
+> 본 프로젝트는 **유출 방지(recall)가 1순위**라 임계값을 약간 낮추는 방향이 유리하다. 실측상 GLiNER를 0.50→0.35로 낮추면 ADDRESS recall 0.88→1.00·PERSON 0.956→0.978로 오르면서 **오탐은 거의 안 늘어** "거의 공짜로 놓침을 줄이는" 구간이다(R20).
 
 > **구현 상태(정직 선언, P3)**: dual-backend **설계·배선·실측 모두 완료**. `stage2/backend.py`(`resolve_ner_backend`)·`stage2/gliner_ner.py`(`GLiNERNEREngine`)·`_workers.py` 분기·`policy.py` `stage2.ner_backend` 파싱·`Engine(ner_backend=…)` env 전파·`serve` 연결·워밍업이 모두 배선되고 **선택 로직은 단위 테스트로 검증**됨(`tests/test_ner_backend.py`). **GLiNER 런타임·품질 실측 완료**(기본 `urchade/gliner_multi_pii-v1`, Apache-2.0): 코퍼스 PERSON recall 0.84→**0.956**, 외부 6리포트에서 spaCy 대비 재현율 동등~우위 + 정밀도 우위(codex 0.81→0.93, gemini 0.63→0.91). 6개 리포트·종합 대조 = [`validation/NER_BACKEND_COMPARISON.md`](../validation/NER_BACKEND_COMPARISON.md).
 
