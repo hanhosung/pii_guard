@@ -98,8 +98,10 @@ PII-Guard는 에이전트와 **같은 PC에서 나란히 도는 협조적 도구
 | **컨트롤/데이터 플레인** | 통제 구역(규칙·키·기록=에이전트 못 건드림) vs 작업 구역(프로젝트 파일=자유). |
 | **Ledger(원장)** | PII를 **원본 없이** 메타데이터로만 남기는 감사 기록. |
 | **HMAC / keyed-hash** | 비밀키를 섞은 해시. 키 없이는 역산 불가 → 저엔트로피 PII도 안전하게 기록. |
-| **Presidio** | MS의 오픈소스 PII 탐지 **프레임워크**(NER+정규식+신뢰도 통합). §20.1. |
-| **spaCy** | NLP 라이브러리. `ko_core_news_lg` = 한국어 NER 모델. §20.2. |
+| **GLiNER** | 라벨 프롬프트로 임의 엔티티를 뽑는 **제로샷 NER**(트랜스포머). Stage2 **기본 백엔드**(한국어 특화 모델). §20.2·§20.3. |
+| **Presidio** | MS의 오픈소스 PII 탐지 **프레임워크**(NER+정규식+신뢰도 통합). spaCy 백엔드에서 사용. §20.1. |
+| **spaCy** | NLP 라이브러리. `ko_core_news_lg` = 한국어 NER 모델. Stage2 **경량 폴백 백엔드**. §20.2. |
+| **NER 백엔드** | Stage2 엔진을 **GLiNER(기본) / spaCy(폴백)** 중 선택하는 추상화. env `PIIGUARD_NER_BACKEND` 또는 정책 `stage2.ner_backend`. §20.3(ADR-11). |
 | **rehydrate/scrub** | scrub=요청에서 PII 제거(마스킹), rehydrate=응답에서 되돌림. |
 
 ---
@@ -114,7 +116,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 
 | 원칙 | 설계 구현 |
 | :-- | :-- |
-| P1 로컬 우선 | 탐지 = 정규식 + 로컬 spaCy NER. **외부 LLM 호출은 중계 외엔 없음.** (DR-1: LLM 탐지 거부) |
+| P1 로컬 우선 | 탐지 = 정규식 + **로컬 NER(GLiNER 기본 / spaCy 폴백)**. **외부 LLM 호출은 중계 외엔 없음.** (DR-1: LLM 탐지 거부) |
 | P2 secure-by-default | `SECURE_DEFAULTS` 바이너리 baked-in. 정책 파일 없어도 시크릿·주민번호 block, 이름·이메일 mask. |
 | P3 거짓 안심 금지 | `boundary.py`가 방어/미방어를 정직 선언. 한계 §19 명문화. coverage gap 가시 기록. |
 | P4 세 금고 금지 | Ledger=메타+HMAC만. 세션 맵=메모리 한정·디스크 미영속. credential passthrough. |
@@ -152,7 +154,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 └────────────┘           │   5. 응답 rehydrate → 클라이언트                                    │
                          │                                                                   │
                          │   ── Stage2 NER 워커 (별도 프로세스, spawn) ──                     │
-                         │      Stage2NERRunner ⇄ _workers (Presidio+spaCy lg)               │
+                         │      Stage2NERRunner ⇄ _workers (GLiNER-ko 기본 / Presidio+spaCy lg 폴백) │
                          │      OOM/timeout 시 코어 생존, Stage1 degrade                       │
                          │                                                                   │
                          │   ── 컨트롤 플레인 (격리) ── 정책 / HMAC키 / Ledger / pf 규칙        │
@@ -161,7 +163,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 
 **프로세스 분할(가용성·R9·R13):**
 - **코어**: `PIIGuardProxy`(`http.server` 기반, 데몬 스레드). Stage1은 인프로세스(경량·결정적).
-- **Stage2 워커**: `multiprocessing`(spawn) 자식. Presidio+spaCy lg 로딩(무거움). **블록당 하드 타임아웃**.
+- **Stage2 워커**: `multiprocessing`(spawn) 자식. 선택된 NER 백엔드 로딩(GLiNER-ko 기본/Presidio+spaCy lg 폴백, 둘 다 무거움). **블록당 하드 타임아웃**.
   워커 OOM/SIGKILL이 코어를 못 죽임 → `Stage2NERRunner.scan()`이 Stage1 결과로 graceful degrade.
 - **fail-closed**: SIGTERM/SIGINT → `os._exit(0)` → OS가 모든 TCP를 RST. 인플라이트 응답이 새지 않음.
 
@@ -190,8 +192,10 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 | 모듈 | 주요 공개 API | 책임 · 핵심 동작 (상세) |
 | :-- | :-- | :-- |
 | `stage2/runner.py` | `Stage2NERRunner`, `Stage2ScanResult`, `.scan(text, stage1_dets)` | **워커 수명·타임아웃·OOM 격리·열화 담당.** `multiprocessing`(spawn)으로 NER 워커를 띄우고 요청/응답 큐로 통신. 블록당 **하드 타임아웃**, 워커 OOM/크래시/예외 시 **Stage1 결과로 graceful degrade** + `fail_reason`·coverage_gap. `_merge_detections`로 Stage1+Stage2 병합. 코어는 절대 안 죽음. |
-| `stage2/_workers.py` | `default_ner_worker_loop`, (테스트용 `_test_noop/slow/oom_worker`) | **서브프로세스에서 도는 워커 루프.** `KoreanNEREngine`을 **지연 임포트**해 무거운 spaCy 모델 로딩을 부모(코어)와 격리. 테스트 워커들은 열화 경로(타임아웃·OOM)를 결정적으로 재현. |
-| `stage2/korean_ner.py` | `KoreanNEREngine`, `.detect(text)`, `resolve_ko_spacy_model()` | **실제 NER 엔진(Presidio+spaCy).** `resolve_ko_spacy_model`이 `PIIGUARD_KO_SPACY_MODEL`>`lg`>`sm` 순으로 모델 선택. `_build_presidio_analyzer`가 한국어 전용 `AnalyzerEngine` 구성, `_strip_ko_particle`로 조사 제거("홍길동은"→"홍길동"). spaCy 라벨(PS/LC/OG)→PERSON/ADDRESS/ORGANIZATION 매핑. |
+| `stage2/_workers.py` | `default_ner_worker_loop`, (테스트용 `_test_noop/slow/oom_worker`) | **서브프로세스에서 도는 워커 루프.** `resolve_ner_backend()`로 선택된 엔진(`GLiNERNEREngine` 또는 `KoreanNEREngine`)을 **지연 임포트**해 무거운 모델 로딩을 부모(코어)와 격리. 두 엔진 모두 동일한 `.detect(text)→List[Detection]` 인터페이스라 워커 루프는 백엔드 무관. 테스트 워커들은 열화 경로(타임아웃·OOM)를 결정적으로 재현. |
+| `stage2/backend.py` | `resolve_ner_backend()`, `NERBackend`(Enum) | **백엔드 선택 추상화(R18·ADR-11).** `PIIGUARD_NER_BACKEND` env > 정책 `stage2.ner_backend` > 기본 `gliner` 순으로 백엔드 결정. 선택된 백엔드의 엔진 클래스를 반환(지연 임포트). |
+| `stage2/gliner_ner.py` | `GLiNERNEREngine`, `.detect(text)`, `resolve_gliner_model()` | **GLiNER 엔진(기본 백엔드).** `resolve_gliner_model`이 `PIIGUARD_GLINER_MODEL` > 한국어 특화 기본(예: `taeminlee/gliner_ko`) 순으로 모델 선택. 라벨 프롬프트(`사람`·`주소`·`조직`)로 제로샷 추출 후 PERSON/ADDRESS/ORGANIZATION 매핑, `min_confidence` 미만 폐기, 조사 제거 재사용. 출력은 `korean_ner.py`와 동일한 `Detection`. |
+| `stage2/korean_ner.py` | `KoreanNEREngine`, `.detect(text)`, `resolve_ko_spacy_model()` | **spaCy NER 엔진(경량 폴백 백엔드, Presidio+spaCy).** `resolve_ko_spacy_model`이 `PIIGUARD_KO_SPACY_MODEL`>`lg`>`sm` 순으로 모델 선택. `_build_presidio_analyzer`가 한국어 전용 `AnalyzerEngine` 구성, `_strip_ko_particle`로 조사 제거("홍길동은"→"홍길동"). spaCy 라벨(PS/LC/OG)→PERSON/ADDRESS/ORGANIZATION 매핑. |
 | `stage2/policy_layer.py` | `Stage2PolicyLayer`, `Stage2PolicyResult` | **Stage2 탐지에 정책 적용.** NER가 찾은 엔티티에 카테고리별 액션(mask)·신뢰도 임계값을 입혀 최종 처리 결정 산출. |
 | `stage2/ner_filters.py` | `is_ner_false_positive(category, text)` | **음성 proximity / NER FP 후필터.** NER 탐지 중 코드토큰(`API_KEY`,`send_email(...)`)·약어(`AWS`,`LGTM`)·base64 blob·일반명사 deny-list(`주석`,`수익자`)를 제거. **제거만**(recall-safe). 정밀도 0.79→0.87. |
 
@@ -285,14 +289,22 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 - **체크섬으로 FP 억제** — 무효 번호는 미탐지(정밀도 우선).
 - 결정적·재현 가능·**프롬프트 인젝션 불가**.
 
-### 6.2 Stage 2 — 문맥 NER (서브프로세스, 타임아웃)
-- `KoreanNEREngine`: Presidio `AnalyzerEngine` + spaCy 한국어 모델.
-- **모델 해석 순서**(`resolve_ko_spacy_model`): `PIIGUARD_KO_SPACY_MODEL` env > `ko_core_news_lg` > `ko_core_news_sm`.
-- spaCy 라벨 → Presidio 엔티티 매핑: `PS→PERSON, LC→LOCATION(=ADDRESS), OG→ORGANIZATION`.
-- 한국어 조사 스트리핑("홍길동은"→"홍길동").
-- `min_confidence`(기본 0.50) 미만 폐기.
+### 6.2 Stage 2 — 문맥 NER (선택형 백엔드, 서브프로세스, 타임아웃)
+- **선택형 백엔드(R18·ADR-11)**: `resolve_ner_backend()`가 엔진을 고른다.
+  - 결정 순서: `PIIGUARD_NER_BACKEND` env > 정책 `stage2.ner_backend` > 기본 **`gliner`**.
+  - 두 엔진은 **동일 인터페이스**(`.detect(text)→List[Detection]`)·**동일 출력 카테고리**(PERSON/ADDRESS/ORGANIZATION). 후단(정책·마스킹·proximity 후필터·degrade)은 백엔드 무관.
+- **`gliner` (기본 백엔드)** — `GLiNERNEREngine`:
+  - 모델 해석(`resolve_gliner_model`): `PIIGUARD_GLINER_MODEL` env > 한국어 특화 기본(예: `taeminlee/gliner_ko`).
+  - 라벨 프롬프트(`사람`·`주소`·`조직`)로 **제로샷 추출** → PERSON/ADDRESS/ORGANIZATION 매핑.
+  - 트랜스포머(재현율 우선). PyTorch 의존 → 옵션 설치 `[ner-gliner]`, 별도 워커 격리.
+- **`spacy` (경량 폴백 백엔드)** — `KoreanNEREngine`: Presidio `AnalyzerEngine` + spaCy 한국어 모델.
+  - 모델 해석(`resolve_ko_spacy_model`): `PIIGUARD_KO_SPACY_MODEL` env > `ko_core_news_lg` > `ko_core_news_sm`.
+  - spaCy 라벨 → 엔티티 매핑: `PS→PERSON, LC→LOCATION(=ADDRESS), OG→ORGANIZATION`.
+- **공통**: 한국어 조사 스트리핑("홍길동은"→"홍길동"), `min_confidence`(기본 0.50) 미만 폐기.
 - **격리·degrade**: `Stage2NERRunner.scan(text, stage1_dets)` — 워커 타임아웃/OOM/예외 시
-  Stage1 결과 반환 + `coverage_gap=True` + `fail_reason`.
+  Stage1 결과 반환 + `coverage_gap=True` + `fail_reason`. (백엔드 무관 동일)
+
+> **구현 상태(정직, P3)**: dual-backend 설계 확정 + spaCy 백엔드 배선·검증 완료. **GLiNER 백엔드(`stage2/gliner_ner.py`)·`resolve_ner_backend()`(`stage2/backend.py`)는 R18 신규 요구사항으로 코드 구현 진행 대상.** 아래 §6.4 GLiNER 행은 측정 예정(목표) 값이다.
 
 ### 6.3 올바른 fast-path (요구사항 §6.3)
 - ❌ "Stage1 clean이면 NER 스킵"은 틀림(NER은 정규식이 놓친 걸 담당).
@@ -311,7 +323,10 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 - `stage2/ner_filters.py`가 NER 탐지 중 **코드토큰·약어·base64 blob·일반명사**를 제거(**제거만** → recall-safe).
 - 정밀도 0.79→0.93. 정책으로 on/off·추가 deny-list 가능(§8).
 
-### 6.4 NER 품질 (ko_core_news_lg, full-pipeline)
+### 6.4 NER 품질
+
+**spaCy 백엔드 (ko_core_news_lg, full-pipeline) — 실측 보증선:**
+
 | 엔티티 | precision | recall |
 | :-- | :-- | :-- |
 | PERSON | 0.97 | 0.84 |
@@ -319,6 +334,16 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 | ORGANIZATION | 1.00 | 0.92 |
 
 (`benchmarks/korean_ner_benchmark.py`, `thresholds_met=true`)
+
+**GLiNER 백엔드 (한국어 특화) — 측정 예정(목표):**
+
+| 엔티티 | precision(목표) | recall(목표) | 상태 |
+| :-- | :-- | :-- | :-- |
+| PERSON | ≥ 0.95 | **≥ 0.90** | ⏳ 백엔드 배선 후 동일 코퍼스로 실측 예정 |
+| ADDRESS | ≥ 0.95 | ≥ 0.95 | ⏳ 동상 |
+| ORGANIZATION | ≥ 0.95 | ≥ 0.90 | ⏳ 동상 |
+
+> 목표는 GLiNER 채택의 핵심 동인인 PERSON 재현율 향상(spaCy 0.84 → ≥0.90)을 명시한다. 실측 전까지 보증선은 spaCy 표이며, GLiNER 실측이 목표 미달이면 기본 백엔드 결정을 재검토한다(ADR-11 재평가 트리거).
 
 ---
 
@@ -513,7 +538,7 @@ RedactionResult
 > 요구사항 §23.3과 동기화. 정직 선언(P3).
 
 1. **KR_ACCOUNT 비표준 포맷 누락** — 라벨 없는 3-3-6 등은 오탐 억제 위해 미탐지. → 문맥 키워드 규칙 또는 인코더 NER 보강.
-2. **PERSON recall 0.84** — 작은 모델 한계. → KoELECTRA/KLUE 교체(설계된 슬롯).
+2. **PERSON recall 0.84** — spaCy(폴백 백엔드) 한계. → **기본 GLiNER 백엔드(R18, 목표 ≥0.90)**, 추가로 KoELECTRA/KLUE 교체(설계된 슬롯).
 3. **egress 락다운 실검증 미수행** — 12 skip. 배포 전 `sudo pytest -m integration`.
 4. **hwp/OCR 미구현** — 2차. 현재 unscannable→block.
 5. **단일 프로세스 권한 모델** — 별도 UID 미적용(단일 사용자 가정).
@@ -531,12 +556,13 @@ RedactionResult
 | ADR-2 | 코어/Stage2 워커 프로세스 분할 | NER OOM이 코어를 못 죽이게(가용성·R9). |
 | ADR-3 | 복원 ON(에이전트 왕복) | 복원 OFF는 사용자 시크릿 영구 파괴 = 자기모순(R10). |
 | ADR-4 | Ledger 메타+HMAC, 원본 미영속 | 세 금고 역설 봉인(P4). 저엔트로피 역산 방지. |
-| ADR-5 | **ko_core_news_lg 채택**(sm 폴백, env override) | recall +0.12~0.18, 정밀도 유지. |
+| ADR-5 | **spaCy 백엔드 모델 = ko_core_news_lg**(sm 폴백, env override) | recall +0.12~0.18, 정밀도 유지. |
 | ADR-6 | **serve NER default-on**(R14) | E2E 갭: 미연결 시 한국어 이름 평문 유출. |
 | ADR-7 | **`--log-masked` 관찰가능성**(R15), 원본 미출력 | 마스킹 검증 + no-raw-in-logs. |
 | **ADR-8 (DR-1)** | **LLM 기반 탐지 거부, 규칙+로컬 인코더 NER 유지** | 외부 LLM=P1위반·자기모순. 생성형 LLM=메모리·비결정성·**프롬프트 인젝션으로 탐지기 무력화**. 인코더 NER은 생성 안 해 인젝션 불가. |
-| **ADR-9** | **Stage2 PII 프레임워크 = Microsoft Presidio** | 완전 로컬 + PII 전용(정규식+NER+문맥+신뢰도 통합) + NLP엔진 교체 추상화 + 감사 설명가능성. 상세 §20.1. |
-| **ADR-10** | **Stage2 NLP 엔진 = spaCy 한국어 모델** | 8GB 메모리·속도·Presidio 네이티브 통합·비생성형(인젝션 불가)·시스템 의존 없음. 상세 §20.2. (변형 sm/lg 선택은 ADR-5) |
+| **ADR-9** | **spaCy 백엔드의 PII 프레임워크 = Microsoft Presidio** | 완전 로컬 + PII 전용(정규식+NER+문맥+신뢰도 통합) + NLP엔진 교체 추상화 + 감사 설명가능성. (GLiNER 백엔드는 프레임워크 없이 직접 매핑.) 상세 §20.1. |
+| **ADR-10** | **Stage2 NLP 엔진 = 선택형 백엔드(GLiNER 기본 / spaCy 폴백)** | GLiNER=한국어 재현율↑(트랜스포머), spaCy=경량·8GB 빠듯 환경 폴백. 둘 다 비생성형(인젝션 불가). 상세 §20.2. (백엔드 선택 메커니즘은 ADR-11, spaCy 변형 sm/lg는 ADR-5) |
+| **ADR-11** | **NER 백엔드 선택 메커니즘 = env + 정책 YAML, 기본 gliner** | `PIIGUARD_NER_BACKEND` > `stage2.ner_backend` > 기본 `gliner`. 동일 인터페이스·동일 카테고리로 후단 백엔드 무관. 상세 §20.3. |
 
 ---
 
@@ -553,7 +579,7 @@ RedactionResult
 | AWS Comprehend PII · Google Cloud DLP · Azure | 클라우드 API | 🔴 **P1(로컬 우선) 정면 위반** — 탐지하려 PII를 클라우드로 전송 = 막으려는 유출을 자행(자기모순). 즉시 탈락. |
 | Nightfall · Private AI · Skyflow · BigID | 상용 | 유료, 외부 의존/온프렘 제약, 블랙박스. |
 | scrubadub | 경량 OSS | 정규식+얕은 NER만. 문맥 강화·신뢰도·확장성·언어 무관 NLP 엔진 부재. |
-| GLiNER / HuggingFace PII 모델 직접 사용 | 신경망 OSS | *프레임워크가 아님* — 정규식·체크섬·문맥·신뢰도·결정 프로세스를 직접 다 구현해야 함. 무거움. |
+| GLiNER / HuggingFace PII 모델 직접 사용 | 신경망 OSS | *프레임워크가 아님* — 정규식·체크섬·문맥·신뢰도·결정 프로세스를 직접 다 구현해야 함. 무거움. ※ **재평가됨**: GLiNER는 ADR-9의 *프레임워크* 대안이 아니라 **별도 NER 백엔드**로 채택(ADR-10·ADR-11). 정규식·체크섬·문맥·신뢰도는 PII-Guard 자체 후단(Stage1·proximity·정책)이 이미 담당하므로, GLiNER는 그 후단에 붙는 NER 엔진으로만 쓰면 되어 "프레임워크 부재"는 더 이상 기각 사유가 아니다. |
 | 자작(정규식만) | in-house | Stage1이 이미 담당. 문맥 PII 불가. |
 
 **결정(Decision).** **Microsoft Presidio**(`presidio-analyzer`/`presidio-anonymizer`)를 Stage2 프레임워크로 채택.
@@ -573,39 +599,94 @@ RedactionResult
 **결과·트레이드오프(Consequences).** 의존성이 무겁고 기본 설정이 영어 중심이라 한국어 재구성이 필요 → 별도
 프로세스 + `[ner]` 옵션 설치로 **격리**(코어는 표준 라이브러리만, ADR-2와 정합).
 
+> **범위 주의(ADR-11 이후).** 본 ADR(Presidio)은 **`spacy` 백엔드에만** 적용된다. 기본 백엔드인 **GLiNER는 Presidio를 거치지 않고** 라벨 프롬프트 결과를 PII-Guard `Detection`으로 직접 매핑한다(프레임워크 레이어 불필요 — 정규식·체크섬·문맥·신뢰도·결정은 Stage1·proximity·정책 후단이 담당). 두 백엔드의 출력 카테고리·인터페이스는 동일하다.
+
 ---
 
-## 20.2 ADR-10 (상세) — Stage2 NLP 엔진으로 spaCy 한국어 모델 채택
+## 20.2 ADR-10 (상세) — Stage2 NLP 엔진 = 선택형 백엔드(GLiNER 기본 / spaCy 폴백)
 
-**맥락(Context).** Presidio(ADR-9)에 꽂을 **NER 두뇌**가 필요했다. 핵심 제약: **타깃이 MacBook Air M2 8GB,
-메모리 예산 ~1~1.5GB**, 요청당 지연 예산(p50<200ms), 그리고 **비생성형**이어야 함(DR-1: 생성형은 프롬프트
-인젝션으로 탐지기가 무력화됨).
+> **개정 이력.** 최초 ADR-10은 8GB 메모리 제약을 근거로 **spaCy 단일 채택**(transformer 보류)이었다.
+> 본 개정(R18)에서 **선택형 dual-backend**로 확장: 한국어 재현율을 끌어올리는 **GLiNER를 기본**으로,
+> 메모리가 빠듯한 환경을 위해 **spaCy를 경량 폴백**으로 유지한다. 단일-spaCy 시절의 근거는 아래
+> "spaCy 폴백 근거"로 보존된다.
+
+**맥락(Context).** Stage1(정규식·체크섬)이 못 잡는 문맥 PII(이름·주소·조직)를 탐지할 **NER 두뇌**가 필요하다.
+제약: **비생성형**(DR-1: 생성형은 프롬프트 인젝션으로 탐지기 무력화), 별도 워커 격리(가용성), 그리고
+환경별로 다른 **메모리 여건**(MacBook Air M2 8GB ~ 충분한 워크스테이션). 단일 모델로는 "재현율"과
+"8GB 적합"을 동시에 만족하기 어렵다 → **선택형 백엔드**로 분리.
 
 **검토한 대안(Alternatives considered).**
 
-| 대안 | 정확도 | 메모리/속도 | 비선택 사유 |
+| 대안 | 정확도 | 메모리/속도 | 판정 |
 | :-- | :-- | :-- | :-- |
-| **HuggingFace transformer** (KoELECTRA·KLUE·KoBERT) | **최상(한국어 SOTA급)** | 🔴 수백MB~GB + PyTorch, 느림 | **8GB 메모리 예산 초과**. → 요구사항 §6.2가 명시한 *향후 업그레이드 경로*로 보류. |
-| **Stanza** (Stanford NLP) | 높음 | 무겁고 느림 | spaCy 대비 메모리·지연 불리. (Presidio 지원은 됨) |
-| **KoNLPy** (Mecab·Komoran·Okt·Kkma) | 형태소는 강하나 **NER 약함** | 중간 | 주 용도가 형태소·품사 분석. **Java/Mecab 시스템 설치** 필요 → 배포 복잡. |
-| **Mecab-ko** | NER 아님 | 가벼움 | 형태소 분석기 — 목적 불일치. |
-| 직접 학습 모델 | 도메인 최적 | 가변 | 학습 데이터·비용 大 (2차). |
+| **GLiNER (한국어 특화)** | **높음** — 제로샷, 한국어 PERSON/주소/조직 강함 | 트랜스포머(PyTorch), 수백MB급, spaCy보다 무거움 | ✅ **기본 채택** — 재현율 우선. 별도 워커·`[ner-gliner]` 옵션 설치로 격리. |
+| **spaCy `ko_core_news_lg`** | 중상(PERSON recall 0.84) | **가벼움·빠름**(Cython, GPU 불필요) | ✅ **경량 폴백 채택** — 8GB 빠듯/저자원 환경. (변형 sm/lg = ADR-5) |
+| **HuggingFace transformer** (KoELECTRA·KLUE·KoBERT) | **최상(SOTA급)** | 🔴 수백MB~GB, 느림 | 추가 업그레이드 경로로 보류(백엔드 슬롯에 동일 방식 추가 가능). |
+| **Stanza** (Stanford NLP) | 높음 | 무겁고 느림 | spaCy 대비 불리. |
+| **KoNLPy / Mecab-ko** | NER 약함/아님 | 중간/가벼움 | 형태소 분석 목적 + Java/Mecab 시스템 설치 → 배포 복잡. |
+| 생성형 LLM(로컬/외부) | — | — | ❌ DR-1로 거부(인젝션·비결정·메모리·P1). |
 
-**결정(Decision).** **spaCy + 공식 한국어 파이프라인 `ko_core_news_lg`**(sm 폴백). 변형 sm/lg 선택은 ADR-5.
+**결정(Decision).** **선택형 백엔드.** 기본 = **GLiNER 한국어 특화 모델**(`PIIGUARD_GLINER_MODEL`로 변형 지정,
+예 `taeminlee/gliner_ko`), 경량 폴백 = **spaCy `ko_core_news_lg`**(sm 재폴백). 선택 메커니즘은 ADR-11.
 
 **근거(Rationale).**
-1. **메모리(결정적)** — spaCy lg는 수백MB로 8GB 예산에 들어감. transformer는 GB급 → 초과.
-2. **속도** — Cython 기반으로 빠름, GPU 불필요 → 지연 예산 충족.
-3. **Presidio 네이티브 통합** — Presidio가 spaCy NLP 엔진을 1급 지원 → 깔끔한 결합.
-4. **시스템 의존 없음** — `ko_core_news_*`를 pip로 설치. KoNLPy류의 Java/Mecab 설치 불필요 → 배포 단순.
-5. **비생성형(인코더)** — 텍스트를 *분류*만 하고 *생성*하지 않음 → **프롬프트 인젝션 불가**(DR-1 핵심 근거).
-6. **공식 한국어 모델 존재** — 별도 학습 없이 PERSON/LOCATION/ORGANIZATION 인식.
+1. **재현율(기본 GLiNER)** — spaCy lg의 한계(PERSON recall 0.84)를 한국어 GLiNER로 끌어올림(목표 ≥0.90).
+   DR-1이 명시한 "로컬 인코더 NER 모델 교체"의 1차 실현.
+2. **메모리 적합(폴백 spaCy)** — 8GB 빠듯/PyTorch 미설치 환경에서도 동작하도록 가벼운 경로를 **보존**.
+3. **비생성형(둘 다)** — GLiNER·spaCy 모두 *분류/추출*만 하고 *생성*하지 않음 → **프롬프트 인젝션 불가**(DR-1 핵심).
+4. **격리(둘 다)** — 무거운 모델은 spawn 워커에서 로드 → OOM이 코어를 못 죽임(ADR-2 정합). GLiNER가 더
+   무겁기에 이 격리는 기본 채택의 전제.
+5. **후단 불변** — 두 백엔드는 동일 `Detection`(PERSON/ADDRESS/ORGANIZATION)을 내므로 정책·마스킹·proximity
+   후필터·degrade가 백엔드와 무관(인터페이스 안정성).
 
-**적용(Implementation).** `resolve_ko_spacy_model()` — `PIIGUARD_KO_SPACY_MODEL` env > `lg` > `sm`. 조사
-스트리핑("홍길동은"→"홍길동")으로 플레이스홀더 매칭 정합.
+**spaCy 폴백 근거(기존 ADR-10 보존).** Cython 기반 속도, GPU 불필요, `ko_core_news_*` pip 설치(Java/Mecab
+불필요)로 배포 단순, Presidio 네이티브 통합(ADR-9). → 저자원 환경의 합리적 기본 폴백.
 
-**결과·트레이드오프(Consequences).** 정확도 천장은 transformer보다 낮음(PERSON recall 0.84) → `KoreanNEREngine`
-추상화로 **모델 교체 슬롯**을 남겨, 더 높은 정확도가 필요하면 KoELECTRA/KLUE로 승급 가능(요구사항 §6.2·§23.4).
+**적용(Implementation).** `resolve_ner_backend()`(`stage2/backend.py`)가 백엔드 결정 → 백엔드별 리졸버가 모델
+선택(`resolve_gliner_model` / `resolve_ko_spacy_model`). 조사 스트리핑("홍길동은"→"홍길동")은 두 백엔드 공통
+후처리로 재사용.
+
+**결과·트레이드오프(Consequences).**
+- GLiNER 기본은 PyTorch 의존을 더한다 → `[ner-gliner]` 옵션 설치 + 별도 venv/워커로 격리(코어는 표준
+  라이브러리만, 무영향).
+- **검증 책무**: GLiNER 실측치 확보 전까지 보증선은 spaCy 실측표(§6.4). GLiNER 실측이 목표(PERSON recall
+  ≥0.90) 미달이면 **기본 백엔드 결정을 재평가**(ADR-11 재평가 트리거).
+- **구현 상태(정직, P3)**: spaCy 백엔드는 배선·검증 완료. GLiNER 백엔드·`resolve_ner_backend()` 배선은
+  R18 신규 요구사항으로 **코드 구현 진행 대상**.
+
+---
+
+## 20.3 ADR-11 (상세) — NER 백엔드 선택 메커니즘 (env + 정책 YAML, 기본 gliner)
+
+**맥락(Context).** ADR-10이 두 백엔드를 두기로 한 이상, **무엇으로·어떻게 고르는지**를 운영자가 제어할
+표준 경로가 필요하다. PII-Guard에는 이미 두 가지 설정 표면이 있다: **환경변수**(`PIIGUARD_*`, 모델 오버라이드에
+사용 중)와 **정책 YAML**(`policy.py`, 핫리로드). 새 노브는 이 둘과 일관돼야 한다.
+
+**결정(Decision).** 백엔드 선택을 **두 경로 모두**로 노출하고 우선순위를 정의한다.
+
+```
+우선순위:  PIIGUARD_NER_BACKEND (env)  >  policy.stage2.ner_backend (YAML)  >  기본값 "gliner"
+모델 변형:  PIIGUARD_GLINER_MODEL / PIIGUARD_KO_SPACY_MODEL (각 백엔드별 env)
+값:        "gliner" | "spacy"   (알 수 없는 값 → 명확한 로드 오류, 침묵 폴백 금지)
+```
+
+**근거(Rationale).**
+1. **env 우선** — 일회성·CI·디버그 오버라이드가 정책 파일 수정 없이 가능(기존 `PIIGUARD_KO_SPACY_MODEL` 관례와 동일).
+2. **정책 YAML** — 배포 영속 설정·핫리로드·감사 대상(정책은 컨트롤플레인). 운영 기본값을 코드 수정 없이 고정.
+3. **기본 `gliner`** — 재현율 우선이 제품 방향(ADR-10). 단, PyTorch 미설치 등으로 GLiNER 로드 실패 시의
+   동작은 **명시적**이어야 한다(아래 트레이드오프).
+4. **침묵 폴백 금지(P3·P5)** — 잘못된 백엔드명이나 누락 의존은 *조용히 다른 백엔드로 넘어가지 않고* 가시
+   오류/경고로 드러낸다. "거짓 안심" 방지.
+
+**적용(Implementation).** `stage2/backend.py`의 `resolve_ner_backend()`가 위 우선순위로 `NERBackend`(Enum)
+결정 → 해당 엔진 클래스를 **지연 임포트**해 반환. `_workers.py`는 반환된 엔진의 `.detect()`만 호출(백엔드 무관).
+정책 파서(`policy.py`)에 `stage2.ner_backend` 키 추가, `PolicyConfig`로 노출·핫리로드.
+
+**결과·트레이드오프(Consequences).**
+- **GLiNER 로드 실패 정책(미확정 → 구현 시 결정)**: 기본 `gliner`인데 의존/모델이 없으면 (a) 가시 오류로
+  중단할지, (b) 경고 + spaCy 자동 폴백할지. **secure-by-default 관점에선 (a) 명시 오류**가 P3에 부합하나,
+  가용성(R9) 관점에선 (b)도 후보. → R18 구현 시 `on_ner_backend_unavailable` 정책 노브로 노출 검토.
+- 두 백엔드 출력 카테고리가 동일하므로 전환 시 정책/마스킹 변경 불필요(인터페이스 안정).
 
 ---
 
