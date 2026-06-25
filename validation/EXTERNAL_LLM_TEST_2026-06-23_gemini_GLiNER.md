@@ -1,15 +1,17 @@
 # 외부 LLM(Gemini) 생성 테스트 결과 — PII-Guard 검출 · GLiNER 엔진 (2026-06-23)
 
-> 입력: `gemini_cases.json` (10항목) · 외부 LLM(Codex 등) 생성 텍스트를 PII-Guard에 입력해 채점. 입력 텍스트는 spaCy 리포트 부록에서 재구성(동일 데이터).
+> ⏱ 2026-06-25 Stage1 보강 엔진으로 재생성. 종합 분석/비교 = `NER_BACKEND_COMPARISON.md` · `STAGE1_RECALL_IMPROVEMENT_2026-06-25.md`.
+
+> 입력: `gemini_cases.json` (10항목) · 외부 LLM(Codex 등) 생성 텍스트를 PII-Guard에 입력해 채점. 증거: [`external_log.txt`](./external_log.txt)
 > 엔진: Stage1(정규식·체크섬) + Stage2 NER(GLiNER · urchade/gliner_multi_pii-v1) + proximity · 20 카테고리.
 
 ## 1. 핵심 결과
 
 | 지표 | 수치 |
 | :-- | :-- |
-| **재현율(Recall)** | **0.847**  (61/72) |
-| **정밀도(Precision)** | **0.910**  (61/67) |
-| 검출 TP / 미검출 FN / 오탐후보 FP | 61 / 11 / 6 |
+| **재현율(Recall)** | **0.931**  (67/72) |
+| **정밀도(Precision)** | **0.918**  (67/73) |
+| 검출 TP / 미검출 FN / 오탐후보 FP | 67 / 5 / 6 |
 
 > ※ 오탐후보(FP)에는 ground truth에 라벨 안 된 실제 PII(은행명 등)나 NER 변동분이 섞일 수 있으니, 아래 §4 부록의 항목별 오탐 목록을 검토해 진짜 over-masking과 구분하세요.
 
@@ -18,7 +20,7 @@
 | 카테고리 | TP | FN | recall |
 | :-- | --: | --: | --: |
 | ADDRESS | 3 | 0 | 1.00 |
-| API_KEY | 2 | 1 | 0.67 ⚠️ |
+| API_KEY | 3 | 0 | 1.00 |
 | AWS_SECRET | 3 | 0 | 1.00 |
 | BIZ_NO | 5 | 0 | 1.00 |
 | CARD | 4 | 0 | 1.00 |
@@ -28,14 +30,14 @@
 | GCP_KEY | 1 | 0 | 1.00 |
 | HOSTNAME | 7 | 0 | 1.00 |
 | IP_ADDRESS | 5 | 0 | 1.00 |
-| KR_ACCOUNT | 1 | 3 | 0.25 ⚠️ |
+| KR_ACCOUNT | 4 | 0 | 1.00 |
 | PASSPORT | 2 | 0 | 1.00 |
-| PASSWORD | 0 | 2 | 0.00 ⚠️ |
+| PASSWORD | 1 | 1 | 0.50 ⚠️ |
 | PERSON | 8 | 2 | 0.80 ⚠️ |
 | PHONE | 7 | 0 | 1.00 |
 | PRIVATE_KEY | 1 | 0 | 1.00 |
 | RRN | 4 | 0 | 1.00 |
-| TOKEN | 1 | 1 | 0.50 ⚠️ |
+| TOKEN | 2 | 0 | 1.00 |
 
 ## 3. 항목별 요약
 
@@ -45,12 +47,12 @@
 | 2 | LOG 01 · 인증 서버 API Key 노출 및 세션 만료 로그 | 1007 | 7 | 7 | 0 | 1 | 🔴 |
 | 3 | VOC 02 · 오프라인 매장 영수증 인증 및 포인트 적립 누락 | 367 | 6 | 6 | 0 | 0 | 🔴 |
 | 4 | LOG 02 · 결제 게이트웨이 웹훅 수신 및 계정 검증 로그 | 871 | 9 | 8 | 1 | 0 | 🔴 |
-| 5 | VOC 03 · 법인 회원 정보 변경 및 정산 증빙 서류 제출 안내 요청 | 409 | 6 | 4 | 2 | 2 | 🔴 |
-| 6 | LOG 03 · 데이터베이스 마이그레이션 중 자격 증명 유출 예외 로그 | 667 | 9 | 8 | 1 | 1 | 🔴 |
+| 5 | VOC 03 · 법인 회원 정보 변경 및 정산 증빙 서류 제출 안내 요청 | 409 | 6 | 5 | 1 | 2 | 🔴 |
+| 6 | LOG 03 · 데이터베이스 마이그레이션 중 자격 증명 유출 예외 로그 | 667 | 9 | 9 | 0 | 1 | 🔴 |
 | 7 | VOC 04 · 글로벌 배송 주소 수정 및 여권번호 예외 처리 요청 | 401 | 6 | 6 | 0 | 0 | 🔴 |
-| 8 | LOG 04 · 클라우드 스토리지 동기화 에러 및 자격증명 노출 | 836 | 7 | 4 | 3 | 0 | 🔴 |
-| 9 | VOC 05 · 가상자산 대행 거래 환불 및 신원 검증 요청 | 445 | 7 | 5 | 2 | 1 | 🔴 |
-| 10 | LOG 05 · 인프라 통합 모니터링 에이전트 자격 증명 수집 로그 | 883 | 9 | 7 | 2 | 0 | 🔴 |
+| 8 | LOG 04 · 클라우드 스토리지 동기화 에러 및 자격증명 노출 | 836 | 7 | 6 | 1 | 0 | 🔴 |
+| 9 | VOC 05 · 가상자산 대행 거래 환불 및 신원 검증 요청 | 445 | 7 | 6 | 1 | 1 | 🔴 |
+| 10 | LOG 05 · 인프라 통합 모니터링 에이전트 자격 증명 수집 로그 | 883 | 9 | 8 | 1 | 0 | 🔴 |
 
 ## 4. 부록 — 전체 항목(텍스트·검출/미검출)
 
@@ -136,8 +138,8 @@ MIIEowIBAAKCAQEA0X8O3vGQ3p...[TRUNCATED].../9kBc=
 ```
 
 - **심은(6)**: `PERSON`=한지영, `EMAIL`=jyhan@partner-company.com, `PHONE`=010-8888-9999, `BIZ_NO`=688-17-36719, `KR_ACCOUNT`=333-9102-33445, `FOREIGN_REG`=120923-1591783
-- ✅ **검출(4)**: `PERSON`=한지영, `EMAIL`=jyhan@partner-company.com, `PHONE`=010-8888-9999, `BIZ_NO`=688-17-36719
-- ❌ **미검출(2)**: `KR_ACCOUNT`=333-9102-33445, `FOREIGN_REG`=120923-1591783
+- ✅ **검출(5)**: `PERSON`=한지영, `EMAIL`=jyhan@partner-company.com, `PHONE`=010-8888-9999, `BIZ_NO`=688-17-36719, `KR_ACCOUNT`=333-9102-33445
+- ❌ **미검출(1)**: `FOREIGN_REG`=120923-1591783
 - ⚠️ **오탐후보(2)**: `ORGANIZATION`=대행업체인데, `RRN`=120923-1591783
 
 ### [6] LOG 03 · 데이터베이스 마이그레이션 중 자격 증명 유출 예외 로그  (667자) · 🔴 block
@@ -162,8 +164,8 @@ CONTACT_NUM="010-7711-2233"
 ```
 
 - **심은(9)**: `HOSTNAME`=prod-db.local, `IP_ADDRESS`=172.16.22.81, `PASSWORD`=P@ssw0rd12345!, `GCP_KEY`=AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q, `PERSON`=강동우, `ADDRESS`=강남구 테헤란로 501, `PHONE`=010-7711-2233, `BIZ_NO`=751-47-92277, `CARD`=4612-2202-9729-9758
-- ✅ **검출(8)**: `HOSTNAME`=prod-db.local, `IP_ADDRESS`=172.16.22.81, `GCP_KEY`=AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q, `PERSON`=강동우, `ADDRESS`=강남구 테헤란로 501, `PHONE`=010-7711-2233, `BIZ_NO`=751-47-92277, `CARD`=4612-2202-9729-9758
-- ❌ **미검출(1)**: `PASSWORD`=P@ssw0rd12345!
+- ✅ **검출(9)**: `HOSTNAME`=prod-db.local, `IP_ADDRESS`=172.16.22.81, `PASSWORD`=P@ssw0rd12345!, `GCP_KEY`=AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q, `PERSON`=강동우, `ADDRESS`=강남구 테헤란로 501, `PHONE`=010-7711-2233, `BIZ_NO`=751-47-92277, `CARD`=4612-2202-9729-9758
+- ❌ **미검출(0)**: —
 - ⚠️ **오탐후보(1)**: `ADDRESS`=5432 closed unexpect
 
 ### [7] VOC 04 · 글로벌 배송 주소 수정 및 여권번호 예외 처리 요청  (401자) · 🔴 block
@@ -196,8 +198,8 @@ Failed parameters dump:
 ```
 
 - **심은(7)**: `HOSTNAME`=backup-target.corp, `IP_ADDRESS`=10.0.12.145, `PERSON`=윤서준, `BIZ_NO`=898-08-21922, `AWS_SECRET`=AKIA9988776655443322, `API_KEY`=ghp_1234567890abcdefghijklmnopqrstVXYZ, `KR_ACCOUNT`=302-1234-5678-90
-- ✅ **검출(4)**: `HOSTNAME`=backup-target.corp, `IP_ADDRESS`=10.0.12.145, `BIZ_NO`=898-08-21922, `AWS_SECRET`=AKIA9988776655443322
-- ❌ **미검출(3)**: `PERSON`=윤서준, `API_KEY`=ghp_1234567890abcdefghijklmnopqrstVXYZ, `KR_ACCOUNT`=302-1234-5678-90
+- ✅ **검출(6)**: `HOSTNAME`=backup-target.corp, `IP_ADDRESS`=10.0.12.145, `BIZ_NO`=898-08-21922, `AWS_SECRET`=AKIA9988776655443322, `API_KEY`=ghp_1234567890abcdefghijklmnopqrstVXYZ, `KR_ACCOUNT`=302-1234-5678-90
+- ❌ **미검출(1)**: `PERSON`=윤서준
 - ⚠️ **오탐후보(0)**: —
 
 ### [9] VOC 05 · 가상자산 대행 거래 환불 및 신원 검증 요청  (445자) · 🔴 block
@@ -207,8 +209,8 @@ Failed parameters dump:
 ```
 
 - **심은(7)**: `PERSON`=최예은, `PHONE`=010-3344-5566, `FOREIGN_REG`=700523-4376198, `KR_ACCOUNT`=010-992341-12-011, `HOSTNAME`=api.internal, `API_KEY`=ghp_ABCdefGHIjklMNOpqrSTUvwxyz1234567890, `EMAIL`=yeeun.choi@cryptomail.net
-- ✅ **검출(5)**: `PERSON`=최예은, `PHONE`=010-3344-5566, `HOSTNAME`=api.internal, `API_KEY`=ghp_ABCdefGHIjklMNOpqrSTUvwxyz1234567890, `EMAIL`=yeeun.choi@cryptomail.net
-- ❌ **미검출(2)**: `FOREIGN_REG`=700523-4376198, `KR_ACCOUNT`=010-992341-12-011
+- ✅ **검출(6)**: `PERSON`=최예은, `PHONE`=010-3344-5566, `KR_ACCOUNT`=010-992341-12-011, `HOSTNAME`=api.internal, `API_KEY`=ghp_ABCdefGHIjklMNOpqrSTUvwxyz1234567890, `EMAIL`=yeeun.choi@cryptomail.net
+- ❌ **미검출(1)**: `FOREIGN_REG`=700523-4376198
 - ⚠️ **오탐후보(1)**: `RRN`=700523-4376198
 
 ### [10] LOG 05 · 인프라 통합 모니터링 에이전트 자격 증명 수집 로그  (883자) · 🔴 block
@@ -233,6 +235,6 @@ CREDENTIALS_CTX: {
 ```
 
 - **심은(9)**: `HOSTNAME`=node-03.local, `IP_ADDRESS`=192.168.100.221, `HOSTNAME`=proxy.internal, `PERSON`=정다은, `RRN`=120923-1591783, `EMAIL`=daeun.jung@enterprise.corp, `PASSWORD`=Mypassword99!, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dXNlcl9pZCI6MTIzNDU.signature, `AWS_SECRET`=AKIA9999888877776666
-- ✅ **검출(7)**: `HOSTNAME`=node-03.local, `IP_ADDRESS`=192.168.100.221, `HOSTNAME`=proxy.internal, `PERSON`=정다은, `RRN`=120923-1591783, `EMAIL`=daeun.jung@enterprise.corp, `AWS_SECRET`=AKIA9999888877776666
-- ❌ **미검출(2)**: `PASSWORD`=Mypassword99!, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dXNlcl9pZCI6MTIzNDU.signature
+- ✅ **검출(8)**: `HOSTNAME`=node-03.local, `IP_ADDRESS`=192.168.100.221, `HOSTNAME`=proxy.internal, `PERSON`=정다은, `RRN`=120923-1591783, `EMAIL`=daeun.jung@enterprise.corp, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dXNlcl9pZCI6MTIzNDU.signature, `AWS_SECRET`=AKIA9999888877776666
+- ❌ **미검출(1)**: `PASSWORD`=Mypassword99!
 - ⚠️ **오탐후보(0)**: —

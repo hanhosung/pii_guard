@@ -30,20 +30,21 @@ NER 소유 3개 카테고리, full-pipeline 기준.
 
 ## 2. 외부 LLM 생성 6개 리포트 종합 (현실형 한·영 혼합) — 실전 검출력
 
-claude·codex·gemini × spaCy·GLiNER raw 채점치. 전체 파이프라인(Stage1+NER) 기준이라 시크릿·정형 PII 등 Stage1 카테고리가 분모에 포함되며, 두 백엔드 차이는 NER 카테고리에서만 발생한다. 각 데이터셋은 spaCy/GLiNER가 **동일 입력**으로 채점됐다.
+claude·codex·gemini × spaCy·GLiNER raw 채점치. 전체 파이프라인(Stage1+NER) 기준이라 시크릿·정형 PII 등 Stage1 카테고리가 분모에 포함되며, 두 백엔드 차이는 NER 카테고리에서만 발생한다. 각 데이터셋은 spaCy/GLiNER가 **동일 입력**으로 채점됐다. **수치는 2026-06-25 Stage1 보강 엔진 기준**(보강 전→후 비교는 `STAGE1_RECALL_IMPROVEMENT_2026-06-25.md`).
 
 | 데이터셋(케이스수) | 백엔드 | 정탐 TP | 미탐 FN | 오탐 FP | 재현율 | 정밀도 |
 | :-- | :-- | --: | --: | --: | --: | --: |
 | **claude** (30) | spaCy | 192 | 12 | 27 | 0.941 | 0.877 |
 | | **GLiNER** | 197 | 7 | 29 | **0.966** | 0.872 |
-| **codex** (10) | spaCy | 71 | 18 | 17 | 0.798 | 0.807 |
-| | **GLiNER** | 76 | 13 | 6 | **0.854** | **0.927** |
-| **gemini** (10) | spaCy | 63 | 9 | 37 | 0.875 | 0.630 |
-| | **GLiNER** | 61 | 11 | 6 | 0.847 | **0.910** |
+| **codex** (10) | spaCy | 82 | 7 | 17 | 0.921 | 0.828 |
+| | **GLiNER** | 88 | 1 | 6 | **0.989** | **0.936** |
+| **gemini** (10) | spaCy | 69 | 3 | 37 | 0.958 | 0.651 |
+| | **GLiNER** | 67 | 5 | 6 | 0.931 | **0.918** |
 
-- **재현율**: GLiNER가 claude(+0.025)·codex(+0.056) 우위, gemini는 소폭 열세(−0.028). 대체로 동등~우위.
-- **정밀도**: GLiNER가 codex(+0.120)·gemini(+0.280) 크게 우위, claude는 동등(−0.005). **오탐(FP)이 전 데이터셋에서 spaCy보다 적거나 비슷**(codex 17→6, gemini 37→6).
-- 즉 Apache PII 특화 모델은 **재현율 우위를 유지하면서 정밀도도 spaCy 이상** — 앞선 taeminlee 측정에서 보였던 "codex 정밀도 약점(ID/코드 오탐)"이 **해소**됐다.
+- **재현율**: GLiNER가 claude(+0.025)·codex(+0.068) 우위, gemini는 소폭 열세(−0.027). 대체로 동등~우위. codex는 **0.989**(거의 완전 검출).
+- **정밀도**: GLiNER가 codex(+0.108)·gemini(+0.267) 크게 우위, claude는 동등(−0.005). **오탐(FP)이 전 데이터셋에서 spaCy보다 적거나 비슷**(codex 17→6, gemini 37→6).
+- Stage1 보강으로 **두 백엔드 모두 재현율 상승**(codex spaCy 0.798→0.921 / GLiNER 0.854→0.989, gemini spaCy 0.875→0.958 / GLiNER 0.847→0.931). 정형 PII(계좌·여권·토큰·키)를 회수한 결과.
+- 결론: **GLiNER(Apache) + Stage1 보강 = 재현율·정밀도 모두 최상**(codex 0.989/0.936, gemini 0.931/0.918).
 
 ### 2-1. 카테고리별 정탐/미탐/오탐 (gemini 데이터셋 예시)
 
@@ -88,8 +89,8 @@ NER 관련 카테고리만 발췌(Stage1 카테고리는 두 백엔드 동일).
 | :-- | :-- |
 | 라벨 코퍼스 재현율(이름·조직 놓침) | **GLiNER** (PERSON 0.956, ORG 0.960) |
 | 라벨 코퍼스 정밀도 | spaCy (오탐 거의 0; GLiNER ORG 오탐 존재) |
-| 외부 3개 데이터셋 재현율 | **GLiNER**(claude·codex) · 동등(gemini) |
-| 외부 3개 데이터셋 정밀도(오탐) | **GLiNER** (codex 0.93·gemini 0.91 vs spaCy 0.81·0.63) |
+| 외부 3개 데이터셋 재현율 | **GLiNER**(claude·codex, codex 0.989) · 동등(gemini) |
+| 외부 3개 데이터셋 정밀도(오탐) | **GLiNER** (codex 0.94·gemini 0.92 vs spaCy 0.83·0.65) |
 | 영문 로그 노이즈 내성 | **GLiNER** |
 
 - **현실형 데이터에서 GLiNER(Apache)가 재현율·정밀도 모두 우위** — 특히 로그·코드 혼합 텍스트에서 오탐이 spaCy의 1/6 수준(gemini FP 37→6).

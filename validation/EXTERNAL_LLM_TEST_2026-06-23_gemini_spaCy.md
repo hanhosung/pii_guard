@@ -1,91 +1,26 @@
 # 외부 LLM(Gemini) 생성 테스트 결과 — PII-Guard 검출 (2026-06-23)
 
-> **입력**: Gemini가 `EXTERNAL_TEST_PROMPT.md` 규칙으로 생성한 **10건**(VOC 5 + 서버로그 5, ground truth 라벨 포함).
-> **방법**: `validation/load_external_test.py`로 PII-Guard(Stage1+Stage2 NER lg + proximity, 20 카테고리)에 입력해 채점.
-> **비교 대상**: [`EXTERNAL_LLM_TEST_2026-06-23_codex.md`](./EXTERNAL_LLM_TEST_2026-06-23_codex.md)(Codex, VOC-only) — 서로 다른 갭을 드러냄.
+> ⏱ 2026-06-25 Stage1 보강 엔진으로 재생성. 종합 분석/비교 = `NER_BACKEND_COMPARISON.md` · `STAGE1_RECALL_IMPROVEMENT_2026-06-25.md`.
 
----
+> 입력: `gemini_cases.json` (10항목) · 외부 LLM(Codex 등) 생성 텍스트를 PII-Guard에 입력해 채점. 증거: [`external_log.txt`](./external_log.txt)
+> 엔진: Stage1(정규식·체크섬) + Stage2 NER(ko_core_news_lg) + proximity · 20 카테고리.
 
-## 0. 한눈에
+## 1. 핵심 결과
 
-| 지표 | 수치 | 비고 |
-| :-- | :-- | :-- |
-| **재현율(Recall)** | **0.875** (63/72) | 유출 방지 견고 |
-| **정밀도(Precision)** | **0.630** (63/100) | ⚠️ **실제론 더 높음** — FP 다수가 라벨 누락 정탐(§1-4) |
-| block | **10/10 항목** | 시크릿·신원·서버정보 포함 → 차단 |
-
----
-
-## 1. 발견 사항 · 근본 원인 분석
-
-### ✅ 1-0. 견고했던 부분 (recall 1.00)
-
-**PERSON 10/10**(JSON 내부 `"name": "최승우"`까지), **IP_ADDRESS·HOSTNAME 전부**(서버 토폴로지 보호 ✓), PASSPORT·RRN·CARD·EMAIL·BIZ_NO·AWS_SECRET·GCP_KEY·PRIVATE_KEY·DRIVER_LICENSE. 영문 로그·JSON 구조 안에서도 핵심 PII/시크릿/서버정보를 잡아 **모든 항목 block**.
-
-### 🔴 1-1. NER이 영문 로그 토큰을 PII로 오인 (정밀도 하락 주범)
-
-서버 로그(영문·코드성) 항목에서 NER이 일반 영문 단어를 **인물/조직으로 오탐**한다.
-
-| 오탐 예 | 오분류 |
+| 지표 | 수치 |
 | :-- | :-- |
-| `auth`(×5, auth-svc에서), `active`, `aborted` | → PERSON |
-| `webhook`, `detected`, `security`, `third`, `ENVIRONMENT`, `Received` | → ORGANIZATION |
+| **재현율(Recall)** | **0.958**  (69/72) |
+| **정밀도(Precision)** | **0.651**  (69/106) |
+| 검출 TP / 미검출 FN / 오탐후보 FP | 69 / 3 / 37 |
 
-- 원인: `stage2/ner_filters.py`의 deny-list가 **한국어 중심**이라 영문 로그 토큰을 못 거른다. (한국어 VOC였던 Codex 배치에선 안 보였음.)
-- 영향: LOG 항목 정밀도 급락(LOG 01에서 FP 12건 등). **유출이 아니라 과잉 마스킹** 문제(보안상 안전 방향이나 로그 분석 품질 저하).
+> ※ 오탐후보(FP)에는 ground truth에 라벨 안 된 실제 PII(은행명 등)나 NER 변동분이 섞일 수 있으니, 아래 §4 부록의 항목별 오탐 목록을 검토해 진짜 over-masking과 구분하세요.
 
-### 🔴 1-2. PASSWORD 키워드 커버리지 부족 (0/2)
-
-`DB_PASS=P@ssw0rd12345!`, `"temporary_pass": "Mypassword99!"` 미검출. 현재 `password=`/`비밀번호` 리터럴만 인식 → **`DB_PASS=`·`temporary_pass:`·`pwd:` 등 변형 키워드는 못 잡음**.
-
-### 🟠 1-3. KR_ACCOUNT 다양한 은행 포맷 미커버 (recall 0.25, 재발)
-
-`333-9102-33445`, `302-1234-5678-90`, `010-992341-12-011` 미검출. (`1002-987-654321`(4-3-6)은 검출.) Codex 배치와 동일한 포맷 커버리지 갭.
-
-### 🟠 1-4. JWT 짧은 서명부 · ghp 길이 (재발/아티팩트)
-
-- JWT `eyJ....signature`(짧은 서명부) 미검출 — 정상 JWT 패턴 가정. (긴 JWT는 검출.)
-- `ghp_...VXYZ`(34자) 미검출 — 실제 GitHub 토큰은 36자, 생성값이 짧음(아티팩트).
-
-### 🟡 1-5. 채점 아티팩트 — 정밀도/재현율 실제로는 더 좋음
-
-- **FOREIGN_REG 0/2는 Gemini 라벨 오류**: `120923-1591783`(7번째 자리=1), `700523-4376198`(=4)는 **RRN 포맷**(외국인등록은 7번째가 5~8). 엔진이 **RRN으로 정확히 탐지·차단** → 유출 아님, 라벨만 틀림.
-- **FP 다수가 라벨 누락 정탐**: `api.internal`(Gemini가 라벨 안 한 진짜 호스트명), 은행명(우리은행·국민카드·하나은행 = ORGANIZATION), 위 RRN. → **실제 정밀도는 0.63보다 높다.**
-
----
-
-## 2. 두 외부 배치의 발견 비교
-
-| 배치 | 성격 | 드러낸 핵심 갭 |
-| :-- | :-- | :-- |
-| Codex (VOC-only, 한국어) | 자연스러운 한국어 문장 | **조사 인접 버그**(`여권번호를` → \b 깨짐) |
-| **Gemini (VOC+LOG)** | 영문 로그·JSON 혼합 | **영문 로그 NER 과잉 오탐** + **PASSWORD 키워드 변형** |
-
-> 다양한 생성기·다양한 데이터 성격이 **서로 다른 실제 갭**을 찾아냈다 — 외부 데이터 다변화의 가치.
-
----
-
-## 3. 수정 우선순위 (권고)
-
-| 순위 | 항목 | 효과 | 난이도 |
-| :-- | :-- | :-- | :-- |
-| 1 | **영문 로그 NER 오탐 억제** — ner_filters에 영문 로그 토큰 deny-list 보강 또는 콘텐츠 게이팅 | 로그 분석 정밀도 ↑ | 낮음 |
-| 2 | **PASSWORD 키워드 확장** — `*_PASS(S)?`, `pwd`, `temporary_pass` 등 | 비밀번호 recall ↑ | 낮음 |
-| 3 | KR_ACCOUNT 포맷 확장 + JWT 패턴 완화 | account/token recall ↑ | 중간 |
-
-> **보안 관점**: 전 항목 block + 시크릿·신원·서버정보 검출로 **유출 방지(재현율)는 견고**. 약점은 주로 **정밀도(영문 로그 과잉 마스킹)**.
-
----
-
-> 아래 §4~ 는 `load_external_test.py` 자동 생성 채점 표 + **10건 전문 부록(텍스트·검출/미검출)**이다.
-
----
-## 4. 카테고리별 재현율
+## 2. 카테고리별 재현율
 
 | 카테고리 | TP | FN | recall |
 | :-- | --: | --: | --: |
 | ADDRESS | 3 | 0 | 1.00 |
-| API_KEY | 2 | 1 | 0.67 ⚠️ |
+| API_KEY | 3 | 0 | 1.00 |
 | AWS_SECRET | 3 | 0 | 1.00 |
 | BIZ_NO | 5 | 0 | 1.00 |
 | CARD | 4 | 0 | 1.00 |
@@ -95,16 +30,16 @@
 | GCP_KEY | 1 | 0 | 1.00 |
 | HOSTNAME | 7 | 0 | 1.00 |
 | IP_ADDRESS | 5 | 0 | 1.00 |
-| KR_ACCOUNT | 1 | 3 | 0.25 ⚠️ |
+| KR_ACCOUNT | 4 | 0 | 1.00 |
 | PASSPORT | 2 | 0 | 1.00 |
-| PASSWORD | 0 | 2 | 0.00 ⚠️ |
+| PASSWORD | 1 | 1 | 0.50 ⚠️ |
 | PERSON | 10 | 0 | 1.00 |
 | PHONE | 7 | 0 | 1.00 |
 | PRIVATE_KEY | 1 | 0 | 1.00 |
 | RRN | 4 | 0 | 1.00 |
-| TOKEN | 1 | 1 | 0.50 ⚠️ |
+| TOKEN | 2 | 0 | 1.00 |
 
-## 5. 항목별 요약
+## 3. 항목별 요약
 
 | # | 제목 | 길이 | 심은 | 검출 | 미검출 | 오탐 | block |
 | --: | :-- | --: | --: | --: | --: | --: | :--: |
@@ -112,14 +47,14 @@
 | 2 | LOG 01 · 인증 서버 API Key 노출 및 세션 만료 로그 | 1007 | 7 | 7 | 0 | 12 | 🔴 |
 | 3 | VOC 02 · 오프라인 매장 영수증 인증 및 포인트 적립 누락 | 367 | 6 | 6 | 0 | 1 | 🔴 |
 | 4 | LOG 02 · 결제 게이트웨이 웹훅 수신 및 계정 검증 로그 | 871 | 9 | 9 | 0 | 5 | 🔴 |
-| 5 | VOC 03 · 법인 회원 정보 변경 및 정산 증빙 서류 제출 안내 요청 | 409 | 6 | 4 | 2 | 2 | 🔴 |
-| 6 | LOG 03 · 데이터베이스 마이그레이션 중 자격 증명 유출 예외 로그 | 667 | 9 | 8 | 1 | 6 | 🔴 |
+| 5 | VOC 03 · 법인 회원 정보 변경 및 정산 증빙 서류 제출 안내 요청 | 409 | 6 | 5 | 1 | 2 | 🔴 |
+| 6 | LOG 03 · 데이터베이스 마이그레이션 중 자격 증명 유출 예외 로그 | 667 | 9 | 9 | 0 | 6 | 🔴 |
 | 7 | VOC 04 · 글로벌 배송 주소 수정 및 여권번호 예외 처리 요청 | 401 | 6 | 6 | 0 | 2 | 🔴 |
-| 8 | LOG 04 · 클라우드 스토리지 동기화 에러 및 자격증명 노출 | 836 | 7 | 5 | 2 | 3 | 🔴 |
-| 9 | VOC 05 · 가상자산 대행 거래 환불 및 신원 검증 요청 | 445 | 7 | 5 | 2 | 2 | 🔴 |
-| 10 | LOG 05 · 인프라 통합 모니터링 에이전트 자격 증명 수집 로그 | 883 | 9 | 7 | 2 | 3 | 🔴 |
+| 8 | LOG 04 · 클라우드 스토리지 동기화 에러 및 자격증명 노출 | 836 | 7 | 7 | 0 | 3 | 🔴 |
+| 9 | VOC 05 · 가상자산 대행 거래 환불 및 신원 검증 요청 | 445 | 7 | 6 | 1 | 2 | 🔴 |
+| 10 | LOG 05 · 인프라 통합 모니터링 에이전트 자격 증명 수집 로그 | 883 | 9 | 8 | 1 | 3 | 🔴 |
 
-## 6. 부록 — 전체 항목(텍스트·검출/미검출)
+## 4. 부록 — 전체 항목(텍스트·검출/미검출)
 
 ### [1] VOC 01 · 결제 수단 등록 실패 및 계정 잠김 문의  (434자) · 🔴 block
 
@@ -203,8 +138,8 @@ MIIEowIBAAKCAQEA0X8O3vGQ3p...[TRUNCATED].../9kBc=
 ```
 
 - **심은(6)**: `PERSON`=한지영, `EMAIL`=jyhan@partner-company.com, `PHONE`=010-8888-9999, `BIZ_NO`=688-17-36719, `KR_ACCOUNT`=333-9102-33445, `FOREIGN_REG`=120923-1591783
-- ✅ **검출(4)**: `PERSON`=한지영, `EMAIL`=jyhan@partner-company.com, `PHONE`=010-8888-9999, `BIZ_NO`=688-17-36719
-- ❌ **미검출(2)**: `KR_ACCOUNT`=333-9102-33445, `FOREIGN_REG`=120923-1591783
+- ✅ **검출(5)**: `PERSON`=한지영, `EMAIL`=jyhan@partner-company.com, `PHONE`=010-8888-9999, `BIZ_NO`=688-17-36719, `KR_ACCOUNT`=333-9102-33445
+- ❌ **미검출(1)**: `FOREIGN_REG`=120923-1591783
 - ⚠️ **오탐후보(2)**: `ORGANIZATION`=하나은행, `RRN`=120923-1591783
 
 ### [6] LOG 03 · 데이터베이스 마이그레이션 중 자격 증명 유출 예외 로그  (667자) · 🔴 block
@@ -229,8 +164,8 @@ CONTACT_NUM="010-7711-2233"
 ```
 
 - **심은(9)**: `HOSTNAME`=prod-db.local, `IP_ADDRESS`=172.16.22.81, `PASSWORD`=P@ssw0rd12345!, `GCP_KEY`=AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q, `PERSON`=강동우, `ADDRESS`=강남구 테헤란로 501, `PHONE`=010-7711-2233, `BIZ_NO`=751-47-92277, `CARD`=4612-2202-9729-9758
-- ✅ **검출(8)**: `HOSTNAME`=prod-db.local, `IP_ADDRESS`=172.16.22.81, `GCP_KEY`=AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q, `PERSON`=강동우, `ADDRESS`=강남구 테헤란로 501, `PHONE`=010-7711-2233, `BIZ_NO`=751-47-92277, `CARD`=4612-2202-9729-9758
-- ❌ **미검출(1)**: `PASSWORD`=P@ssw0rd12345!
+- ✅ **검출(9)**: `HOSTNAME`=prod-db.local, `IP_ADDRESS`=172.16.22.81, `PASSWORD`=P@ssw0rd12345!, `GCP_KEY`=AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q, `PERSON`=강동우, `ADDRESS`=강남구 테헤란로 501, `PHONE`=010-7711-2233, `BIZ_NO`=751-47-92277, `CARD`=4612-2202-9729-9758
+- ❌ **미검출(0)**: —
 - ⚠️ **오탐후보(6)**: `ORGANIZATION`=state for, `ORGANIZATION`=ENVIRONMENT, `ORGANIZATION`=idx, `ADDRESS`=SEQ-2026, `PERSON`=aborted, `ADDRESS`=5432 closed unexpect
 
 ### [7] VOC 04 · 글로벌 배송 주소 수정 및 여권번호 예외 처리 요청  (401자) · 🔴 block
@@ -263,8 +198,8 @@ Failed parameters dump:
 ```
 
 - **심은(7)**: `HOSTNAME`=backup-target.corp, `IP_ADDRESS`=10.0.12.145, `PERSON`=윤서준, `BIZ_NO`=898-08-21922, `AWS_SECRET`=AKIA9988776655443322, `API_KEY`=ghp_1234567890abcdefghijklmnopqrstVXYZ, `KR_ACCOUNT`=302-1234-5678-90
-- ✅ **검출(5)**: `HOSTNAME`=backup-target.corp, `IP_ADDRESS`=10.0.12.145, `PERSON`=윤서준, `BIZ_NO`=898-08-21922, `AWS_SECRET`=AKIA9988776655443322
-- ❌ **미검출(2)**: `API_KEY`=ghp_1234567890abcdefghijklmnopqrstVXYZ, `KR_ACCOUNT`=302-1234-5678-90
+- ✅ **검출(7)**: `HOSTNAME`=backup-target.corp, `IP_ADDRESS`=10.0.12.145, `PERSON`=윤서준, `BIZ_NO`=898-08-21922, `AWS_SECRET`=AKIA9988776655443322, `API_KEY`=ghp_1234567890abcdefghijklmnopqrstVXYZ, `KR_ACCOUNT`=302-1234-5678-90
+- ❌ **미검출(0)**: —
 - ⚠️ **오탐후보(3)**: `PERSON`=Binding, `ADDRESS`=found, `ORGANIZATION`=농협은행
 
 ### [9] VOC 05 · 가상자산 대행 거래 환불 및 신원 검증 요청  (445자) · 🔴 block
@@ -274,8 +209,8 @@ Failed parameters dump:
 ```
 
 - **심은(7)**: `PERSON`=최예은, `PHONE`=010-3344-5566, `FOREIGN_REG`=700523-4376198, `KR_ACCOUNT`=010-992341-12-011, `HOSTNAME`=api.internal, `API_KEY`=ghp_ABCdefGHIjklMNOpqrSTUvwxyz1234567890, `EMAIL`=yeeun.choi@cryptomail.net
-- ✅ **검출(5)**: `PERSON`=최예은, `PHONE`=010-3344-5566, `HOSTNAME`=api.internal, `API_KEY`=ghp_ABCdefGHIjklMNOpqrSTUvwxyz1234567890, `EMAIL`=yeeun.choi@cryptomail.net
-- ❌ **미검출(2)**: `FOREIGN_REG`=700523-4376198, `KR_ACCOUNT`=010-992341-12-011
+- ✅ **검출(6)**: `PERSON`=최예은, `PHONE`=010-3344-5566, `KR_ACCOUNT`=010-992341-12-011, `HOSTNAME`=api.internal, `API_KEY`=ghp_ABCdefGHIjklMNOpqrSTUvwxyz1234567890, `EMAIL`=yeeun.choi@cryptomail.net
+- ❌ **미검출(1)**: `FOREIGN_REG`=700523-4376198
 - ⚠️ **오탐후보(2)**: `RRN`=700523-4376198, `ORGANIZATION`=기업은행
 
 ### [10] LOG 05 · 인프라 통합 모니터링 에이전트 자격 증명 수집 로그  (883자) · 🔴 block
@@ -300,6 +235,6 @@ CREDENTIALS_CTX: {
 ```
 
 - **심은(9)**: `HOSTNAME`=node-03.local, `IP_ADDRESS`=192.168.100.221, `HOSTNAME`=proxy.internal, `PERSON`=정다은, `RRN`=120923-1591783, `EMAIL`=daeun.jung@enterprise.corp, `PASSWORD`=Mypassword99!, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dXNlcl9pZCI6MTIzNDU.signature, `AWS_SECRET`=AKIA9999888877776666
-- ✅ **검출(7)**: `HOSTNAME`=node-03.local, `IP_ADDRESS`=192.168.100.221, `HOSTNAME`=proxy.internal, `PERSON`=정다은, `RRN`=120923-1591783, `EMAIL`=daeun.jung@enterprise.corp, `AWS_SECRET`=AKIA9999888877776666
-- ❌ **미검출(2)**: `PASSWORD`=Mypassword99!, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dXNlcl9pZCI6MTIzNDU.signature
+- ✅ **검출(8)**: `HOSTNAME`=node-03.local, `IP_ADDRESS`=192.168.100.221, `HOSTNAME`=proxy.internal, `PERSON`=정다은, `RRN`=120923-1591783, `EMAIL`=daeun.jung@enterprise.corp, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dXNlcl9pZCI6MTIzNDU.signature, `AWS_SECRET`=AKIA9999888877776666
+- ❌ **미검출(1)**: `PASSWORD`=Mypassword99!
 - ⚠️ **오탐후보(3)**: `ORGANIZATION`=context, `ORGANIZATION`=Insufficient, `PERSON`=aborted

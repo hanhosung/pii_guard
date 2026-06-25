@@ -53,4 +53,5 @@
 - **전체 테스트 2727 passed / 12 skipped / 0 failed** — 정밀도·기존 동작 회귀 없음.
 - 기존 proximity 테스트(3-3-6·4-2-7 승격, 무문맥 미승격 FP 억제)도 모두 통과.
 
-> 측정 재현: `validation/load_external_test.py`(codex/gemini), `efficacy_test.py`(claude) — 입력은 6개 외부 리포트 부록에서 재구성한 동일 데이터. 백엔드 `PIIGUARD_NER_BACKEND=spacy` 고정.
+> 측정 재현: 외부 6개 리포트 부록에서 재구성한 동일 데이터를 spaCy 백엔드(`PIIGUARD_NER_BACKEND=spacy`)로 채점.
+> **BEFORE 수치 = 보강 전(git 이력 커밋 `92c01e9` 이전)**, AFTER = 본 보강 후. 보강 후의 `validation/` 6개 리포트는 모두 AFTER 기준으로 재생성됨(`EXTERNAL_LLM_TEST_2026-06-23_*`). 두 백엔드 종합 비교 = `NER_BACKEND_COMPARISON.md`.

@@ -1,5 +1,7 @@
 # PII-Guard 실효성 검증 리포트 (Claude 자체 테스트 · GLiNER 엔진)
 
+> ⏱ 2026-06-25 Stage1 보강 엔진으로 재생성. 종합 분석/비교 = `NER_BACKEND_COMPARISON.md` · `STAGE1_RECALL_IMPROVEMENT_2026-06-25.md`.
+
 > 생성: 자동화 하니스 `validation/efficacy_test.py` · 증거 로그: [`efficacy_test_log.txt`](./efficacy_test_log.txt)
 > 엔진: `Engine` + `Stage2NERRunner`(GLiNER · urchade/gliner_multi_pii-v1) · 30 케이스 · 한국어 중심+영문 시크릿 · **실전형(까다롭게)** · 재현율+정밀도 측정
 
