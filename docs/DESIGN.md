@@ -288,6 +288,11 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
   - BIZ_NO: 사업자번호 체크섬
 - **체크섬으로 FP 억제** — 무효 번호는 미탐지(정밀도 우선).
 - 결정적·재현 가능·**프롬프트 인젝션 불가**.
+- **정형 PII recall 보강(R19)** — FN 분석상 NER 미검출의 ~79%가 정형 PII(Stage1 영역)였다. 비표준 변형을 결정적으로 보강:
+  ① KR_ACCOUNT 비표준 계좌 포맷 일반화(`proximity.py`, 하이픈 2~3개+자릿수 9~14, 트리거 게이팅 유지)
+  ② PASSPORT 조사 인접 경계 버그 수정(`(?!\w)`→`(?![A-Za-z0-9])` — `M12345678를`가 깨지던 문제)
+  ③ JWT 2번째 세그먼트 `eyJ` 강제 제거 ④ GitHub `ghp_` 길이 `{36,}`→`{20,}` ⑤ PASSWORD 접두 라벨(`DB_PASS=`·`temporary_pass:`).
+  **정밀도 회귀 없이** 외부 데이터 recall↑(codex 0.798→0.921·gemini 0.875→0.958, 정형 PII 미검출 27→10). 이 보강은 **NER 백엔드와 무관**(두 백엔드 공통 이득). 수치 = `validation/NER_BACKEND_COMPARISON.md §5`·`STAGE1_RECALL_IMPROVEMENT_2026-06-25.md`.
 
 ### 6.2 Stage 2 — 문맥 NER (선택형 백엔드, 서브프로세스, 타임아웃)
 - **선택형 백엔드(R18·ADR-11)**: `resolve_ner_backend()`가 엔진을 고른다.
