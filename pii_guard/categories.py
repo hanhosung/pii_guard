@@ -379,21 +379,23 @@ KR_ACCOUNT = CategorySpec(
 # ── PASSPORT ──────────────────────────────────────────────────────────────────
 _PASSPORT_RULES = [
     # Korean e-passport: M/S/F + 8 digits (new) or letter+digit combos
+    # 경계로 (?![A-Za-z0-9])를 쓴다 — (?!\w)는 한국어 조사("M12345678를")를 \w로 보고 매치를 깨므로,
+    # 알파벳/숫자로만 확장 차단하고 한글 조사·구두점은 허용(조사 인접 미검출 버그 수정).
     PatternRule(
         "passport_kr",
-        re.compile(r"(?<!\w)[MSF][A-Z]?\d{7,8}(?!\w)"),
+        re.compile(r"(?<![A-Za-z0-9])[MSF][A-Z]?\d{7,8}(?![A-Za-z0-9])"),
         0.85,
     ),
     # US passport: letter + 8 digits (9 total)
     PatternRule(
         "passport_us",
-        re.compile(r"(?<!\w)[A-Z]\d{8}(?!\w)"),
+        re.compile(r"(?<![A-Za-z0-9])[A-Z]\d{8}(?![A-Za-z0-9])"),
         0.80,
     ),
     # Generic ICAO: 1-2 letters + 6-9 digits
     PatternRule(
         "passport_generic",
-        re.compile(r"(?<!\w)[A-Z]{1,2}\d{6,9}(?!\w)"),
+        re.compile(r"(?<![A-Za-z0-9])[A-Z]{1,2}\d{6,9}(?![A-Za-z0-9])"),
         0.75,
     ),
     # Labelled: "passport: M12345678"
@@ -495,10 +497,11 @@ _API_KEY_RULES = [
         re.compile(r"sk-(?:proj-)?[a-zA-Z0-9\-_]{20,}"),
         0.95,
     ),
-    # GitHub PAT (classic and fine-grained)
+    # GitHub PAT (classic and fine-grained). 본체 길이를 {36,}→{20,}로 완화 —
+    # ghp_ 등 접두가 매우 특이해 오탐 위험이 낮고, 길이가 짧은 변형/만료 토큰도 잡는다.
     PatternRule(
         "apikey_github",
-        re.compile(r"(?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9]{36,}"),
+        re.compile(r"(?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9]{20,}"),
         0.97,
     ),
     # Stripe live/test keys
@@ -619,11 +622,13 @@ GCP_KEY = CategorySpec(
 
 # ── TOKEN ─────────────────────────────────────────────────────────────────────
 _TOKEN_RULES = [
-    # JWT: three base64url segments
+    # JWT: header(eyJ…) + 2 base64url segments. 2번째 세그먼트의 eyJ 강제를 제거 —
+    # 실제 JWT 페이로드는 eyJ로 시작하지만, 변형/난독 토큰도 'eyJ헤더.X.X' 형태면 잡도록 완화.
+    # 헤더는 eyJ+8자 이상, 나머지 두 세그먼트는 3자 이상으로 최소 길이를 둬 오탐을 억제.
     PatternRule(
         "token_jwt",
         re.compile(
-            r"eyJ[a-zA-Z0-9\-_]+\.eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+"
+            r"eyJ[a-zA-Z0-9\-_]{8,}\.[a-zA-Z0-9\-_]{3,}\.[a-zA-Z0-9\-_]{3,}"
         ),
         0.97,
     ),
@@ -702,11 +707,13 @@ PRIVATE_KEY = CategorySpec(
 
 # ── PASSWORD ──────────────────────────────────────────────────────────────────
 _PASSWORD_RULES = [
-    # JSON/YAML/ENV assignment patterns
+    # JSON/YAML/ENV assignment patterns. 키워드에 `<prefix>_pass[word|wd]` 형태를 추가 —
+    # DB_PASS=, temporary_pass:, user_passwd= 같은 접두형 비밀번호 라벨도 잡는다.
+    # 'pass' 단독은 제외(passport/passenger 오탐 방지) — 접두 '_pass'일 때만 인정.
     PatternRule(
         "password_assignment",
         re.compile(
-            r"""(?:password|passwd|passphrase|secret|pwd)\s*
+            r"""(?:password|passwd|passphrase|secret|pwd|[a-z0-9]+_pass(?:word|wd)?)\s*
             (?:=|:)\s*
             ['"]?(?!\s*$)(?!\s*\*)([^\s'",;|&>]{6,})['"]?""",
             re.VERBOSE | re.IGNORECASE,

@@ -90,6 +90,11 @@ class ContextRule(NamedTuple):
     validator: Optional[Callable[[str], bool]] = None  # (선택) 정규화된 값에 추가 체크섬 검증
 
 
+def _acct_len_ok(digits: str) -> bool:
+    """계좌 후보의 (하이픈 제거 후) 총 자릿수가 9~14 범위인지. RRN(13, 하이픈 1개)·카드(16)와 구분."""
+    return 9 <= len(digits) <= 14
+
+
 def build_rules(config: ProximityConfig) -> Tuple[ContextRule, ...]:
     """[설정 → 규칙 목록] 정책 설정(ProximityConfig)을 받아 실제 ContextRule 목록을 만든다."""
     acct = tuple(config.account_triggers)         # 계좌 트리거를 튜플로 고정(설정에서 가져옴)
@@ -99,17 +104,16 @@ def build_rules(config: ProximityConfig) -> Tuple[ContextRule, ...]:
     # 비밀번호 패턴: (비밀번호|비번|암호) 뒤에 선택적 :/= 와 공백, 그 다음 값(4~40자, 구분문자 전까지)을 캡처.
     pw_pattern = re.compile(rf"(?:{pw_alt})\s*[:=]?\s*([^\s,，.。!?'\"]{{4,40}})")
     return (
-        # 규칙1) KR_ACCOUNT — 비표준 3-3-6 포맷(예: 123-456-789012). 앞뒤가 숫자가 아닐 때만 매치.
+        # 규칙1) KR_ACCOUNT — 하이픈으로 구분된 다양한 계좌 포맷을 일반화해서 잡는다.
+        #   매칭: 2~6자리 + (하이픈+1~7자리)를 2~3번 반복(= 하이픈 2~3개). 예: 3-3-6, 4-2-7, 3-2-6,
+        #   3-4-5, 4-4-4, 3-4-4-2, 3-6-2-3 등 은행별 비표준 포맷 전부 포괄.
+        #   하이픈 2개 이상을 요구해 RRN(하이픈 1개)과 구분하고, 자릿수 9~14 검증으로 카드(16)도 배제.
+        #   '계좌 트리거(은행명/입금/계좌…)'가 근처에 있을 때만 승격하므로 오탐(주문번호 등)은 억제된다.
         ContextRule(
             "KR_ACCOUNT", CategoryClass.KOREAN_PII, Action.TOKENIZE_ROUNDTRIP, MaskStyle.TOKENIZE,
-            re.compile(r"(?<!\d)(\d{3}-\d{3}-\d{6})(?!\d)"),   # (?<!\d)…(?!\d): 더 긴 숫자열 안쪽 매치 방지
-            acct, w, 0.70, "prox_kr_acct_336",                 # 계좌 트리거, 창 w, 신뢰도 0.70, 규칙ID
-        ),
-        # 규칙2) KR_ACCOUNT — 카카오/토스뱅크식 4-2-7 포맷(예: 3333-01-1234567).
-        ContextRule(
-            "KR_ACCOUNT", CategoryClass.KOREAN_PII, Action.TOKENIZE_ROUNDTRIP, MaskStyle.TOKENIZE,
-            re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{7})(?!\d)"),
-            acct, w, 0.70, "prox_kr_acct_427",
+            re.compile(r"(?<!\d)(\d{2,6}(?:-\d{1,7}){2,3})(?!\d)"),  # 하이픈 2~3개짜리 숫자 그룹
+            acct, w, 0.70, "prox_kr_acct_generic",
+            validator=_acct_len_ok,                                  # 정규화 후 자릿수 9~14만 통과
         ),
         # 규칙3) BIZ_NO — 하이픈 없는 10자리 숫자. "사업자"가 근처에 있고 + 체크섬까지 통과해야 승격(오탐 억제).
         ContextRule(
