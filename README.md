@@ -28,7 +28,7 @@
 | **재현율(Recall)** | **0.95** |
 | **정밀도(Precision)** | **0.94** |
 
-정형 PII(API키·카드·여권·이메일·전화)는 사실상 1.00. 전체 **2685 테스트 통과**. 상세 — [`validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md`](validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md).
+정형 PII(API키·카드·여권·이메일·전화)는 사실상 1.00. 전체 **2685 테스트 통과**. 상세 — [`validation/EXTERNAL_LLM_TEST_2026-06-23_claude_spaCy.md`](validation/EXTERNAL_LLM_TEST_2026-06-23_claude_spaCy.md).
 
 ---
 
@@ -152,7 +152,7 @@ PII-Guard는 에이전트와 **같은 PC에서 도는 협조적 게이트웨이*
 - [요구사항 명세](docs/pii-guard-requirements.md) — 원칙·위협모델·정책·결정기록
 - [설계 문서(DESIGN)](docs/DESIGN.md) — as-built 아키텍처·모듈맵·ADR
 - [Proximity 설계](docs/design/PROXIMITY_DESIGN.md) — 탐지 보완 설계
-- [실효성 검증](validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md) · [NER 백엔드 비교](validation/NER_BACKEND_COMPARISON.md)
+- [실효성 검증](validation/EXTERNAL_LLM_TEST_2026-06-23_claude_spaCy.md) · [NER 백엔드 비교](validation/NER_BACKEND_COMPARISON.md)
 
 ---
 
