@@ -1,73 +1,95 @@
-# Stage2 NER 백엔드 비교 — spaCy vs GLiNER (2026-06-25)
+# Stage2 NER 백엔드 측정 — spaCy vs GLiNER (2026-06-25)
 
-> 두 백엔드(`spacy`=Presidio+ko_core_news_lg, `gliner`=taeminlee/gliner_ko)를 **두 종류의 데이터**로 비교했다.
-> ① 라벨 코퍼스(합성, ground-truth) — 순수 모델 품질. ② 외부 LLM VOC 케이스(현실형 한·영 혼합) — 실전 검출력.
-> 하니스: `benchmarks/korean_ner_benchmark.py --ner-backend`, `validation/load_external_test.py`.
-
----
-
-## 0. 한눈에 (결론)
-
-- **모델 품질만 보면 GLiNER가 우위**: 깨끗한 한국어에서 PERSON 재현율 0.84→**0.978**, 현실형 혼합 텍스트에서 정밀도 0.63→**0.82**(오탐 37→14).
-- **실제 프록시(서브프로세스) 경로에 치명적 통합 결함이 있었음**: GLiNER 콜드 모델 로드(~14.4s)가 Stage2 **블록당 기본 타임아웃(10s)을 초과** → 매 요청이 타임아웃 degrade → GLiNER NER이 한 번도 기여하지 못하고 이름/주소가 Stage1로 새어나감(§3).
-- **→ ✅ 해결**: serve 시작 시 워커를 미리 로드하는 **워밍업(`Stage2NERRunner.warmup()`)** 도입으로, 콜드로드를 블록 타임아웃 밖에서 끝낸 뒤 트래픽을 받게 함(§4). 폴백(spaCy 자동 전환)은 미도입으로 결정.
+> 두 백엔드의 한국어 비정형 PII(PERSON·ADDRESS·ORGANIZATION) 검출 성능을 **두 종류의 데이터**로 측정한다.
+> ① 라벨 코퍼스(합성, ground-truth) — 순수 모델 품질. ② 외부 LLM 생성 VOC/로그 케이스(현실형 한·영 혼합) — 실전 검출력.
+> 모든 측정은 모델 로드 후 동일 입력으로 수행했다. 재현: `benchmarks/korean_ner_benchmark.py --ner-backend {spacy,gliner}`.
+>
+> - **백엔드**: `spacy` = Presidio + `ko_core_news_lg` · `gliner` = `taeminlee/gliner_ko`
+> - **지표**: 정탐(TP)=정답을 맞게 검출 · 오탐(FP)=PII 아닌 것을 PII로 검출 · 미탐(FN)=정답을 놓침
+> - precision = TP/(TP+FP) · recall = TP/(TP+FN)
 
 ---
 
-## 1. 라벨 코퍼스 (합성·ground-truth, in-process 워밍업) — 순수 모델 품질
+## 1. 라벨 코퍼스 (합성·ground-truth) — 순수 모델 품질
 
-| 카테고리 | spaCy P | spaCy R | GLiNER P | GLiNER R |
-| :-- | --: | --: | --: | --: |
-| PERSON | 0.974 | 0.844 | 0.800 | **0.978** |
-| ADDRESS | 1.000 | 1.000 | 1.000 | 1.000 |
-| ORGANIZATION | 1.000 | 0.920 | 0.862 | **1.000** |
+NER 소유 3개 카테고리, full-pipeline 기준.
 
-- GLiNER: **재현율↑**(PERSON +0.13, ORG +0.08), **정밀도↓**(PERSON −0.17, ORG −0.14).
-- 정밀도 하락 원인: 주소 분절(`전라`/`좌수영`), 전화번호를 PERSON으로 오인 등.
-- 리포트: `validation/gliner_benchmark.json`, `validation/spacy_benchmark.json` (둘 다 전 임계값 통과).
+| 카테고리 | 백엔드 | precision | recall | 정탐(TP) | 오탐(FP) | 미탐(FN) |
+| :-- | :-- | --: | --: | --: | --: | --: |
+| **PERSON** | spaCy | 0.974 | 0.844 | 38 | 1 | 7 |
+| | **GLiNER** | 0.800 | **0.978** | **44** | 11 | **1** |
+| **ADDRESS** | spaCy | 1.000 | 1.000 | 25 | 0 | 0 |
+| | **GLiNER** | 1.000 | 1.000 | 25 | 0 | 0 |
+| **ORGANIZATION** | spaCy | 1.000 | 0.920 | 23 | 0 | 2 |
+| | **GLiNER** | 0.862 | **1.000** | **25** | 4 | **0** |
 
-## 2. 외부 LLM VOC 케이스 (현실형 한·영 혼합, 전체 파이프라인) — 실전 검출력
+- **GLiNER = 재현율 우위**: PERSON 미탐 7→1, ORG 미탐 2→0 (놓치는 이름·조직이 거의 없음).
+- **spaCy = 정밀도 우위**: 오탐 PERSON 1·ORG 0 (군더더기 검출이 적음).
+- ADDRESS는 두 백엔드 모두 완전 일치(25/25).
 
-> ⚠️ **공정성 주의**: GLiNER를 기본 설정(10s 타임아웃)으로 돌리면 콜드로드 타임아웃으로 **NER 전부 0**이 된다(§3).
-> 아래 GLiNER 수치는 **워밍업 + 60s 타임아웃**으로 그 결함을 우회해 모델 본연의 검출력만 측정한 값이다.
+## 2. 외부 LLM 생성 VOC/로그 (현실형 한·영 혼합) — 실전 검출력
 
-| 지표 | spaCy | GLiNER (공정) | GLiNER (기본 10s, 결함) |
-| :-- | --: | --: | --: |
-| 재현율 | 0.875 (63/72) | 0.861 (62/72) | 0.694 (50/72) |
-| 정밀도 | 0.630 (63/100) | **0.816 (62/76)** | 0.926 |
-| 오탐(FP) | **37** | **14** | 4 |
-| PERSON | 10/10 | 10/10 | **0/10** ← degrade |
-| ADDRESS | 3/3 | 2/3 | **0/3** ← degrade |
+10개 케이스(VOC + 서버 로그), 전체 파이프라인(Stage1 + NER) 합산. Stage1 카테고리는 두 백엔드 공통이므로 차이는 NER 카테고리에서만 발생한다.
 
-- **현실형 데이터에서는 GLiNER가 명확히 우수**: 재현율 거의 동일(0.861 vs 0.875)인데 **정밀도 0.82 vs 0.63**, 오탐 14 vs 37.
-- spaCy의 오탐 37건은 알려진 약점 — 영문 로그 토큰(`auth`·`webhook`·`active`)을 인물/조직으로 과잉 추출. GLiNER는 이 노이즈에 강함.
-- Stage1 카테고리(EMAIL·CARD·RRN·시크릿 등)는 두 백엔드 동일(차이는 NER 카테고리에서만 발생).
+| 지표 | spaCy | GLiNER |
+| :-- | --: | --: |
+| 정탐(TP) | 63 | 62 |
+| 미탐(FN) | 9 | 10 |
+| **오탐(FP)** | **37** | **14** |
+| recall | 0.875 | 0.861 |
+| **precision** | **0.630** | **0.816** |
 
----
+- 재현율은 거의 동일(0.875 vs 0.861)하나 **정밀도는 GLiNER가 크게 우위(0.816 vs 0.630)** — 오탐이 37→14로 절반 이하.
 
-## 3. 🔴 치명적 발견 — GLiNER 콜드로드 vs Stage2 타임아웃 (실제 경로 결함)
+### 2-1. 카테고리별 정탐/미탐/오탐
 
-`Stage2NERRunner`는 워커 응답에 **블록당 하드 타임아웃(기본 `DEFAULT_TIMEOUT=10.0s`)**을 건다. GLiNER **첫 호출 모델 로드는 ~14.4s**.
+NER 관련 카테고리만 발췌(Stage1 카테고리는 두 백엔드 동일).
 
-검증(가드 있는 실제 .py, `taeminlee/gliner_ko`):
-
-| 타임아웃 | 콜드 결과 | 검출 |
+| 카테고리 | spaCy TP/FN/FP | GLiNER TP/FN/FP |
 | :-- | :-- | :-- |
-| 10s (기본) | `Stage2NERTimeout: worker did not respond within 10.0s` → **degrade** | `[]` |
-| 40s | 콜드 14.4s **성공** | PERSON 김철수, ADDRESS 서울특별시·강남구 |
-| 40s (웜) | 0.09s | PERSON 홍길동, ADDRESS 부산광역시 |
+| PERSON | 10 / 0 / **12** | 10 / 0 / **6** |
+| ADDRESS | 3 / 0 / 3 | 2 / 1 / 1 |
+| ORGANIZATION | 0 / 0 / **19** | 0 / 0 / **4** |
 
-- 타임아웃 시 워커가 **kill**되므로, 다음 요청은 다시 콜드로드→다시 타임아웃 → **영원히 웜업되지 못함**.
-- 결과: **기본 백엔드가 GLiNER인데도 실제 serve 경로에서는 매 요청이 Stage1로 degrade** → 이름·주소가 마스킹되지 않고 통과(coverage_gap만 기록). **보안상 중대**(기본값이 조용히 무력화).
-- spaCy는 로드가 더 빨라(≈수 초 < 10s) 이 경로에서 정상 동작 → 현재 **실제로 NER이 작동하는 건 spaCy뿐**.
+> PERSON·ADDRESS 정탐은 두 백엔드 모두 사실상 동일(이름 10/10). 차이는 **오탐 규모**: spaCy ORG 19·PERSON 12 vs GLiNER ORG 4·PERSON 6.
 
 ---
 
-## 4. 조치 / 결정
+## 3. 오탐(FP) 분류 — 성격별
 
-1. **✅ (완료) GLiNER 워밍업 분리** — `Stage2NERRunner.warmup()` 추가 + `serve`가 시작 시 호출. 모델 로드를 **블록 타임아웃 밖**(관대한 1회 예산 `WARMUP_TIMEOUT=90s`)에서 끝낸 뒤 트래픽을 받는다.
-   - 검증: warmup 13.6s 후, 기본 10s 타임아웃에서 scan **0.15s 성공**(PERSON 김철수·ADDRESS 서울특별시/강남구, degrade 없음). §3의 결함 해소.
-2. **폴백 정책 — 현행 유지로 결정(spaCy 자동 폴백 미구현)** — Stage2 실패 시 기존대로 **Stage1로 degrade + coverage_gap 가시화**를 유지한다. (워밍업으로 콜드로드 타임아웃이 사라져 상시 degrade 문제는 해소됨. `on_ner_backend_unavailable` spaCy 폴백은 도입하지 않음 — 의사결정 기록.)
-3. **기본 백엔드 = GLiNER 유지** — 모델 품질(코퍼스 재현율)·현실형 정밀도 모두 GLiNER 우위이고, 워밍업(1)으로 실제 경로에서 정상 동작함이 확인됨. 정밀도보다 재현율이 덜 중요한(또는 저자원) 환경은 `spacy` 백엔드 선택.
+오탐 37/14건을 성격으로 나누면 "진짜 과검"과 "라벨 누락·채점 아티팩트"가 섞여 있다.
 
-> 데이터 출처: Codex/Gemini 생성 외부 케이스 10건, 합성 NER 코퍼스(`pii_guard/corpus/ner_benchmark_corpus.py`, seed=42). 수치는 본 문서 표에 인라인 기록(원천 산출물은 `benchmarks/korean_ner_benchmark.py --ner-backend {spacy,gliner}`로 재현 가능).
+### 3-1. spaCy 오탐 (총 37)
+
+| 성격 | 예시 | 비고 |
+| :-- | :-- | :-- |
+| **진짜 과검 — 영문 로그 토큰** | `PERSON`=auth(다수)·active / `ORGANIZATION`=detected·security·third·found·webhook·Received | 영문·코드성 로그 단어를 인물/조직으로 오인 → **실제 over-masking** |
+| 라벨 누락 정탐(실제 PII) | `ORGANIZATION`=우리은행·국민카드·하나은행 | 진짜 조직명이나 ground truth에 라벨 없음 → FP로 집계 |
+| 채점 아티팩트 | `RRN`=120923-1591783·700523-4376198 / `HOSTNAME`=api.internal | RRN 포맷을 RRN으로 정탐(정답 라벨은 FOREIGN_REG) · 미라벨 실제 호스트 |
+
+### 3-2. GLiNER 오탐 (총 14)
+
+| 성격 | 예시 | 비고 |
+| :-- | :-- | :-- |
+| **진짜 과검 — ID/코드 토큰** | `PERSON`=ORD-2026-1102·TX-9988231·v3.2.0·TRACK-002931-KR | 주문/트랜잭션 ID·버전 문자열을 인물로 오인 |
+| 라벨 누락 정탐(실제 PII) | `ORGANIZATION`=우리은행·국민카드·하나은행·기업은행 | 진짜 은행명이나 라벨 없음 → FP로 집계 |
+| 채점 아티팩트 | `RRN`=120923-1591783·700523-4376198 / `HOSTNAME`=api.internal | spaCy와 동일(Stage1/라벨 기인, 백엔드 무관) |
+
+> **요지**: 두 백엔드의 "라벨 누락·아티팩트" 오탐(은행명·RRN·호스트)은 거의 동일하다. 백엔드 차이는 **진짜 과검**에서 나온다 — spaCy는 **영문 로그 토큰**을, GLiNER는 **ID/코드 토큰**을 오인하지만 GLiNER 쪽 규모가 훨씬 작다(영문 로그 노이즈에 강함).
+
+---
+
+## 4. 종합
+
+| 관점 | 우위 |
+| :-- | :-- |
+| 라벨 코퍼스 재현율(이름·조직 놓침) | **GLiNER** (PERSON 0.978, ORG 1.00) |
+| 라벨 코퍼스 정밀도 | spaCy (오탐 거의 0) |
+| 현실형 VOC 재현율 | 동등 (0.86 vs 0.88) |
+| 현실형 VOC 정밀도(오탐) | **GLiNER** (0.82 vs 0.63, 오탐 14 vs 37) |
+| 영문 로그 노이즈 내성 | **GLiNER** |
+
+- **깨끗한 한국어**에서는 GLiNER가 재현율(놓치지 않음), spaCy가 정밀도(군더더기 없음) 우위.
+- **현실형 혼합 텍스트**에서는 GLiNER가 재현율 동등 + 정밀도 우위 → 종합 우위.
+
+> 데이터: 합성 NER 코퍼스(`pii_guard/corpus/ner_benchmark_corpus.py`, seed=42), 외부 LLM 생성 VOC/로그 10건. 수치는 본 문서 표에 인라인 기록(원천은 `benchmarks/korean_ner_benchmark.py`로 재현 가능).

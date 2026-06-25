@@ -306,7 +306,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 - **워밍업(콜드로드 분리)**: GLiNER 콜드 모델 로드(~14.4s)는 블록당 기본 타임아웃(10s)을 초과해, 워밍업이
   없으면 매 요청이 타임아웃→워커 kill→**상시 Stage1 degrade**(이름/주소 누출)가 된다. 그래서
   `Stage2NERRunner.warmup()`(관대한 1회 예산 `WARMUP_TIMEOUT=90s`)을 `serve` 시작 시 호출해 모델을
-  **블록 타임아웃 밖**에서 미리 로드한다. 이후 scan은 로드된 모델로 0.1~0.2s 내 응답. (검증·수치 = `validation/NER_BACKEND_COMPARISON.md`)
+  **블록 타임아웃 밖**에서 미리 로드한다. 이후 scan은 로드된 모델로 0.1~0.2s 내 응답. (검증 = `tests/test_ner_backend.py` warmup 테스트)
 
 > **구현 상태(정직, P3)**: dual-backend 설계·배선 **구현 완료** — `stage2/backend.py`(`resolve_ner_backend`/`load_engine_class`)·`stage2/gliner_ner.py`(`GLiNERNEREngine`)·`_workers.py` 백엔드 분기·`policy.py`(`stage2.ner_backend`)·`Engine(ner_backend=)` env 전파·`serve` 연결. 선택 로직은 단위테스트(`tests/test_ner_backend.py`, 20케이스)로 검증. GLiNER **런타임·품질도 실측 완료**(`taeminlee/gliner_ko`, 스모크 `validation/gliner_smoke.py` PASS + 코퍼스 벤치마크 `validation/gliner_benchmark.json`, 전 임계값 통과) — 아래 §6.4 GLiNER 행은 실측치다.
 
@@ -691,8 +691,8 @@ RedactionResult
 **결과·트레이드오프(Consequences).**
 - **콜드로드 vs 블록 타임아웃(실측 결함 → 해결)**: GLiNER 콜드 로드(~14.4s) > 블록 기본 타임아웃(10s)이라
   워밍업 없이는 매 요청이 degrade돼 GLiNER 기본이 사실상 무력화됐다(이름 누출). → `Stage2NERRunner.warmup()`
-  + `serve` 시작 시 호출로 **해결**(콜드로드를 블록 타임아웃 밖에서 1회 수행). 상세·검증 = §6.2,
-  `validation/NER_BACKEND_COMPARISON.md`.
+  + `serve` 시작 시 호출로 **해결**(콜드로드를 블록 타임아웃 밖에서 1회 수행). 상세 = §6.2, 검증 =
+  `tests/test_ner_backend.py`.
 - **GLiNER 로드 실패 정책 — 결정: spaCy 자동 폴백 미도입**. Stage2 실패/불가 시 기존대로 **Stage1 degrade +
   coverage_gap 가시화**를 유지한다(`on_ner_backend_unavailable` 노브는 추가하지 않음). 근거: 워밍업으로
   상시-degrade 원인이 제거됐고, 남는 실패는 진짜 인프라 장애이므로 침묵 폴백보다 **가시화(P3·P5)**가 낫다.
