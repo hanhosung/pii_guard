@@ -27,9 +27,9 @@ NER 소유 3개 카테고리, full-pipeline 기준.
 - **spaCy = 정밀도 우위**: 오탐 PERSON 1·ORG 0 (군더더기 검출이 적음).
 - ADDRESS는 두 백엔드 모두 완전 일치(25/25).
 
-## 2. 외부 LLM 생성 VOC/로그 (현실형 한·영 혼합) — 실전 검출력
+## 2. 외부 LLM 생성 VOC/로그 (Gemini 데이터셋, 현실형 한·영 혼합) — 실전 검출력
 
-10개 케이스(VOC + 서버 로그), 전체 파이프라인(Stage1 + NER) 합산. Stage1 카테고리는 두 백엔드 공통이므로 차이는 NER 카테고리에서만 발생한다.
+Gemini 생성 10개 케이스(VOC + 서버 로그), 전체 파이프라인(Stage1 + NER) 합산. Stage1 카테고리는 두 백엔드 공통이므로 차이는 NER 카테고리에서만 발생한다. (3개 데이터셋 전체 비교는 §2-2.)
 
 | 지표 | spaCy | GLiNER |
 | :-- | --: | --: |
@@ -53,9 +53,33 @@ NER 관련 카테고리만 발췌(Stage1 카테고리는 두 백엔드 동일).
 
 > PERSON·ADDRESS 정탐은 두 백엔드 모두 사실상 동일(이름 10/10). 차이는 **오탐 규모**: spaCy ORG 19·PERSON 12 vs GLiNER ORG 4·PERSON 6.
 
+### 2-2. 6개 리포트 종합 대조 (3 데이터셋 × 2 백엔드)
+
+`validation/`의 외부 LLM 테스트 6개 리포트(claude·codex·gemini × spaCy·GLiNER) raw 채점치를 한 표로 모았다. 전체 파이프라인(Stage1+NER) 기준이라 시크릿·정형 PII 등 Stage1 카테고리가 분모에 포함되며, 두 백엔드 차이는 NER 카테고리(PERSON/ADDRESS/ORGANIZATION)에서만 발생한다. 각 데이터셋은 spaCy/GLiNER가 **동일 입력**으로 채점됐다.
+
+| 데이터셋(케이스수) | 백엔드 | 정탐 TP | 미탐 FN | 오탐 FP | 재현율 | 정밀도 |
+| :-- | :-- | --: | --: | --: | --: | --: |
+| **claude** (30) | spaCy | 192 | 12 | 27 | 0.941 | 0.877 |
+| | **GLiNER** | 197 | 7 | 41 | **0.966** | 0.828 |
+| **codex** (10) | spaCy | 71 | 18 | 17 | 0.798 | **0.807** |
+| | **GLiNER** | 75 | 14 | 36 | **0.843** | 0.676 |
+| **gemini** (10) | spaCy | 63 | 9 | 37 | 0.875 | 0.630 |
+| | **GLiNER** | 62 | 10 | 14 | 0.861 | **0.816** |
+
+**재현율 차이(GLiNER − spaCy)**: claude +0.025, codex +0.045, gemini −0.014 — **세 데이터셋 모두 GLiNER가 더 적게 놓침**(미탐 FN: claude 12→7, codex 18→14).
+
+**정밀도 차이(GLiNER − spaCy)**: claude −0.049, codex **−0.131**, gemini **+0.186** — 데이터 성격에 따라 갈림.
+- **gemini(서버 로그 다수)**: GLiNER 대폭 우위 — spaCy가 영문 로그 토큰(`auth`·`webhook`)을 인물/조직으로 과잉 추출(FP 37), GLiNER는 강함(FP 14).
+- **codex(자연어 VOC)**: GLiNER 열세 — 주문/트랜잭션 ID·코드 토큰(`ORD-2026`·`TX-9988231`·`v3.2.0`)을 PERSON으로 오인해 FP 증가(17→36).
+- **claude(자연어 VOC)**: 소폭 열세 — codex와 유사하게 GLiNER의 ID/코드 토큰 오탐.
+
+> **요지**: **재현율(유출 방지)은 GLiNER가 전반 우위**. 정밀도는 **로그·코드 혼합 텍스트에서는 GLiNER가 크게 유리**(영문 토큰 노이즈 내성), **자연어 VOC에서는 spaCy가 유리**(GLiNER가 ID/코드를 이름으로 오인). 두 백엔드의 오탐 상당수는 라벨 누락 정탐(은행명=ORG)·채점 아티팩트(RRN 포맷)로, 실제 과검은 §3 분류 참고.
+>
+> 출처 리포트: `EXTERNAL_LLM_TEST_2026-06-23_{claude,codex,gemini}_{spaCy,GLiNER}.md`
+
 ---
 
-## 3. 오탐(FP) 분류 — 성격별
+## 3. 오탐(FP) 분류 — 성격별 (Gemini 데이터셋 기준)
 
 오탐 37/14건을 성격으로 나누면 "진짜 과검"과 "라벨 누락·채점 아티팩트"가 섞여 있다.
 
@@ -85,11 +109,12 @@ NER 관련 카테고리만 발췌(Stage1 카테고리는 두 백엔드 동일).
 | :-- | :-- |
 | 라벨 코퍼스 재현율(이름·조직 놓침) | **GLiNER** (PERSON 0.978, ORG 1.00) |
 | 라벨 코퍼스 정밀도 | spaCy (오탐 거의 0) |
-| 현실형 VOC 재현율 | 동등 (0.86 vs 0.88) |
-| 현실형 VOC 정밀도(오탐) | **GLiNER** (0.82 vs 0.63, 오탐 14 vs 37) |
-| 영문 로그 노이즈 내성 | **GLiNER** |
+| 외부 3개 데이터셋 재현율(유출 방지) | **GLiNER** (claude·codex·gemini 모두 미탐↓, §2-2) |
+| 정밀도 — 로그·코드 혼합(gemini) | **GLiNER** (0.82 vs 0.63 · 영문 로그 토큰 내성) |
+| 정밀도 — 자연어 VOC(codex·claude) | **spaCy** (GLiNER가 ID/코드 토큰을 이름으로 오인) |
 
-- **깨끗한 한국어**에서는 GLiNER가 재현율(놓치지 않음), spaCy가 정밀도(군더더기 없음) 우위.
-- **현실형 혼합 텍스트**에서는 GLiNER가 재현율 동등 + 정밀도 우위 → 종합 우위.
+- **재현율(놓치지 않음=유출 방지)은 GLiNER가 전반 우위** — 코퍼스·외부 3종 모두에서 미탐이 더 적다.
+- **정밀도(과검)는 데이터 성격에 따라 갈린다**: 영문 로그·코드가 섞인 텍스트는 GLiNER가 깨끗하고, 순수 자연어 VOC에서는 GLiNER가 주문/트랜잭션 ID를 이름으로 오인해 spaCy가 더 정밀하다.
+- 보안(유출 방지) 우선이면 GLiNER, 자연어 VOC 정밀도 우선이면 spaCy 선택이 합리적.
 
-> 데이터: 합성 NER 코퍼스(`pii_guard/corpus/ner_benchmark_corpus.py`, seed=42), 외부 LLM 생성 VOC/로그 10건. 수치는 본 문서 표에 인라인 기록(원천은 `benchmarks/korean_ner_benchmark.py`로 재현 가능).
+> 데이터: 합성 NER 코퍼스(`pii_guard/corpus/ner_benchmark_corpus.py`, seed=42) + 외부 LLM 생성 6개 리포트(claude 30 · codex 10 · gemini 10 케이스 × spaCy/GLiNER). 수치는 본 문서 표에 인라인 기록(코퍼스는 `benchmarks/korean_ner_benchmark.py`로 재현 가능).
