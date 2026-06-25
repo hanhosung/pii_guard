@@ -20,7 +20,9 @@ PII-Guard 카테고리로 되매핑한다. 트랜스포머 기반이라 spaCy보
 설치/모델
 ---------
 - 의존: `pip install pii-guard[ner-gliner]` (gliner + torch).
-- 모델: 한국어 특화 GLiNER(기본 `taeminlee/gliner_ko`). `PIIGUARD_GLINER_MODEL` 환경변수로 교체 가능.
+- 모델: 기본 `urchade/gliner_multi_pii-v1`(다국어 PII GLiNER, **Apache-2.0 → 상업 사용 가능**).
+  `PIIGUARD_GLINER_MODEL` 환경변수로 교체 가능. (한국어 특화 `taeminlee/gliner_ko`는 성능은 동등하나
+  CC-BY-NC-4.0 비상업 라이선스라 상업 제품 기본값에서 제외 — 비상업 용도면 env로 지정.)
 - 이 모듈은 Stage2 서브프로세스 워커 안에서만 import되도록 설계됐다(무거운 모델을 부모에
   올리지 않기 위함). gliner/torch import는 첫 detect 호출 때까지 지연된다.
 
@@ -52,8 +54,10 @@ logger = logging.getLogger(__name__)          # 이 모듈 전용 로거
 #: 모델 오버라이드용 환경변수 이름
 _GLINER_MODEL_ENV_VAR = "PIIGUARD_GLINER_MODEL"
 
-#: 기본 한국어 특화 GLiNER 모델
-_DEFAULT_GLINER_MODEL = "taeminlee/gliner_ko"
+#: 기본 GLiNER 모델 — Apache-2.0(상업 사용 가능)인 다국어 PII 모델.
+#: 한국어 코퍼스 실측상 한국어 특화 모델과 종합 동등(PERSON 정밀도는 오히려 더 높음).
+#: 비상업 용도로 한국어 특화 모델이 필요하면 PIIGUARD_GLINER_MODEL=taeminlee/gliner_ko(CC-BY-NC).
+_DEFAULT_GLINER_MODEL = "urchade/gliner_multi_pii-v1"
 
 # GLiNER에 넘길 '한국어 라벨' → PII-Guard 카테고리 매핑.
 # GLiNER는 여기 키들을 라벨로 받아 추출하고, 반환 결과의 label은 넘긴 키와 같다.

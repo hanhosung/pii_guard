@@ -1,7 +1,7 @@
 # PII-Guard 실효성 검증 리포트 (Claude 자체 테스트 · GLiNER 엔진)
 
 > 생성: 자동화 하니스 `validation/efficacy_test.py` · 증거 로그: [`efficacy_test_log.txt`](./efficacy_test_log.txt)
-> 엔진: `Engine` + `Stage2NERRunner`(GLiNER · taeminlee/gliner_ko) · 30 케이스 · 한국어 중심+영문 시크릿 · **실전형(까다롭게)** · 재현율+정밀도 측정
+> 엔진: `Engine` + `Stage2NERRunner`(GLiNER · urchade/gliner_multi_pii-v1) · 30 케이스 · 한국어 중심+영문 시크릿 · **실전형(까다롭게)** · 재현율+정밀도 측정
 
 ---
 
@@ -24,7 +24,7 @@
 | **FN** | 미검출 (False Negative) | 진짜 PII를 **놓침** (빠져나감) | 위험물을 그냥 통과시킴 |
 | **FP** | 오탐 (False Positive) | PII 아닌 걸 **PII로 잘못 잡음** (과잉) | 멀쩡한 물건을 위험물로 압수 |
 
-이번 검증: 텍스트에 **심어둔 진짜 PII = 204개**. 이 중 **197개 잡고(TP)**, **7개 놓치고(FN)**, 추가로 **41개를 잘못 잡았습니다(FP 후보)**.
+이번 검증: 텍스트에 **심어둔 진짜 PII = 204개**. 이 중 **197개 잡고(TP)**, **7개 놓치고(FN)**, 추가로 **29개를 잘못 잡았습니다(FP 후보)**.
 
 ### 2.2 재현율(Recall) — "놓치지 않은 비율"
 
@@ -39,22 +39,22 @@
 > **공식:  정밀도 = TP ÷ (TP + FP) = 진짜 PII ÷ 내가 잡은 전체**
 
 - **의미**: 엔진이 "PII"라고 잡은 것 중 **몇 %가 실제로 PII였나.** 낮으면 **과잉 마스킹**(멀쩡한 단어·코드를 가림)이 많다는 뜻 → 작업 방해.
-- **이번 수치(raw)**: 197 ÷ (197 + 41) = 197 ÷ 238 = **0.828**  → 잡은 것의 약 **83%**가 진짜 PII.
-- 한 줄 해석: 100번 "PII다"라고 가리면 약 **17번은 헛가림**(과잉).
+- **이번 수치(raw)**: 197 ÷ (197 + 29) = 197 ÷ 226 = **0.872**  → 잡은 것의 약 **87%**가 진짜 PII.
+- 한 줄 해석: 100번 "PII다"라고 가리면 약 **13번은 헛가림**(과잉).
 
 ### 2.4 왜 'Raw'와 'Triaged(보정)' 두 가지인가
 
 자동 채점에는 두 가지 **불공정**이 끼어 있어, 보정 전(raw)과 후(triaged)를 함께 제시합니다.
 
-- **보정① — 비라벨 정탐 13건** (정밀도에 영향): 은행명(국민·신한은행 등)=조직, 영문 이름(John Smith 등)은 **사실 진짜 PII인데 제가 정답표(ground truth)에 안 적어둔** 것입니다. 엔진은 맞게 잡았는데 채점이 "오탐"으로 처리 → 이걸 정탐으로 되돌립니다.
+- **보정① — 비라벨 정탐 5건** (정밀도에 영향): 은행명(국민·신한은행 등)=조직, 영문 이름(John Smith 등)은 **사실 진짜 PII인데 제가 정답표(ground truth)에 안 적어둔** 것입니다. 엔진은 맞게 잡았는데 채점이 "오탐"으로 처리 → 이걸 정탐으로 되돌립니다.
 - **보정② — 출제 오류 FN 2건** (재현율에 영향): 제가 만든 더미 주민번호 중 **체크섬이 무효**인 게 있었습니다. 무효 번호는 엔진이 안 잡는 게 **정상**이므로, 이 미검출은 엔진 잘못이 아니라 제 출제 실수 → 분모에서 제외합니다.
 
 | 지표 | Raw (보정 전) | **Triaged (보정 후)** | 보정 내용 |
 | :-- | :-- | :-- | :-- |
 | **재현율** | 0.966  (197/204) | **0.975**  (197/202) | 출제오류 FN 2건 제외(분모 204→202) |
-| **정밀도** | 0.828  (197/238) | **0.882**  (210/238) | 비라벨 정탐 13건을 TP로(오탐 41→28) |
+| **정밀도** | 0.872  (197/226) | **0.894**  (202/226) | 비라벨 정탐 5건을 TP로(오탐 29→24) |
 
-> 즉 **실제 성능은 보정값(재현율 ~0.98 / 정밀도 ~0.88)에 가깝고**, 진짜 over-masking은 28건입니다.
+> 즉 **실제 성능은 보정값(재현율 ~0.98 / 정밀도 ~0.89)에 가깝고**, 진짜 over-masking은 24건입니다.
 
 ### 2.5 보안 관점 — 두 지표 중 무엇이 더 중요한가
 
@@ -76,10 +76,10 @@
 | FOREIGN_REG | 1 | 0 | 1.00 |
 | GCP_KEY | 1 | 0 | 1.00 |
 | KR_ACCOUNT | 18 | 0 | 1.00 |
-| ORGANIZATION | 10 | 1 | 0.91 |
+| ORGANIZATION | 11 | 0 | 1.00 |
 | PASSPORT | 3 | 0 | 1.00 |
 | PASSWORD | 5 | 0 | 1.00 |
-| PERSON | 40 | 2 | 0.95 |
+| PERSON | 39 | 3 | 0.93 |
 | PHONE | 34 | 1 | 0.97 |
 | PRIVATE_KEY | 1 | 0 | 1.00 |
 | RRN | 9 | 2 | 0.82 ⚠️ |
@@ -93,11 +93,11 @@
 
 | 케이스 | 카테고리 | 값 | 원인 |
 | :-- | :-- | :-- | :-- |
-| 04 | ORGANIZATION | `네이버` | NER 미탐지(단일 언급·문맥 부족) |
-| 13 | PERSON | `한지민` | NER 미탐지(단일 언급·문맥 부족) |
+| 10 | PERSON | `박건우` | NER 미탐지(단일 언급·문맥 부족) |
 | 19 | PERSON | `문가영` | NER 미탐지(단일 언급·문맥 부족) |
 | 19 | PHONE | `010-5566-1122` | NER 인접 매칭/스팬 경계 영향(점검 필요) |
 | 19 | ADDRESS | `경기 고양시 일산동구 중앙로 1275` | NER 미탐지(단일 언급·문맥 부족) |
+| 22 | PERSON | `박준혁` | NER 미탐지(단일 언급·문맥 부족) |
 
 **(B) 출제 오류 (엔진 정상 — 무효 체크섬이라 미검출이 정답):**
 
@@ -106,40 +106,36 @@
 
 ## 5. 오탐(FP) 분석
 
-오탐 후보 41건을 분류하면:
+오탐 후보 29건을 분류하면:
 
-- **비라벨 정탐 13건** (실제 PII인데 ground truth에 안 넣음 → 사실상 정탐): 은행명(국민·신한·우리·하나·농협·카카오뱅크·기업은행)=ORGANIZATION, 영문 이름(John Smith·Mike Brown·Kevin Park)=PERSON 등.
-- **진짜 over-masking 28건** (비PII를 PII로 오인 — 실제 정밀도 손해):
+- **비라벨 정탐 5건** (실제 PII인데 ground truth에 안 넣음 → 사실상 정탐): 은행명(국민·신한·우리·하나·농협·카카오뱅크·기업은행)=ORGANIZATION, 영문 이름(John Smith·Mike Brown·Kevin Park)=PERSON 등.
+- **진짜 over-masking 24건** (비PII를 PII로 오인 — 실제 정밀도 손해):
 
 | 케이스 | 오분류 | 값 | 유형 |
 | :-- | :-- | :-- | :-- |
-| 01 | PERSON | `ORD-20240613-0091` | 일반명사→인물 오분류 |
-| 02 | PERSON | `v2.3.1` | 일반명사→인물 오분류 |
+| 02 | ORGANIZATION | `인프라팀` | 일반명사/약어→조직 오분류 |
 | 02 | HOSTNAME | `wiki.internal` | 기타 |
+| 03 | ORGANIZATION | `정형외` | 일반명사/약어→조직 오분류 |
 | 05 | DRIVER_LICENSE | `123456789012` | 기타 |
 | 06 | ORGANIZATION | `대박공인중개사` | 일반명사/약어→조직 오분류 |
-| 06 | PERSON | `18억 5천` | 일반명사→인물 오분류 |
-| 07 | PERSON | `EMP-2024-0312` | 일반명사→인물 오분류 |
-| 09 | ORGANIZATION | `신한` | 일반명사/약어→조직 오분류 |
-| 09 | PERSON | `1588-0000` | 일반명사→인물 오분류 |
-| 10 | PERSON | `민준이랑` | 일반명사→인물 오분류 |
-| 10 | PERSON | `서윤` | 일반명사→인물 오분류 |
-| 10 | ADDRESS | `강남역` | 지명/역명→주소 오분류 |
-| 13 | PERSON | `약 1,200명` | 일반명사→인물 오분류 |
-| 15 | PERSON | `760312-2345671` | 일반명사→인물 오분류 |
-| 16 | PERSON | `INV-0613` | 일반명사→인물 오분류 |
-| 19 | ORGANIZATION | `신한` | 일반명사/약어→조직 오분류 |
-| 20 | ADDRESS | `미국` | 지명/역명→주소 오분류 |
+| 07 | ORGANIZATION | `글로벌사업팀이며` | 일반명사/약어→조직 오분류 |
+| 09 | PERSON | `고객` | 일반명사→인물 오분류 |
+| 09 | PERSON | `고객` | 일반명사→인물 오분류 |
+| 09 | ORGANIZATION | `인터넷뱅킹` | 일반명사/약어→조직 오분류 |
+| 10 | ORGANIZATION | `대학 동기 모임` | 일반명사/약어→조직 오분류 |
+| 10 | PERSON | `민준이랑 서윤이` | 일반명사→인물 오분류 |
+| 10 | ADDRESS | `강남역 근처` | 지명/역명→주소 오분류 |
+| 14 | ORGANIZATION | `수학 단` | 일반명사/약어→조직 오분류 |
+| 18 | PERSON | `고객` | 일반명사→인물 오분류 |
+| 19 | ORGANIZATION | `테니스 동호회` | 일반명사/약어→조직 오분류 |
+| 19 | ADDRESS | `양재 시민의 숲 코트입니다` | 지명/역명→주소 오분류 |
 | 20 | ADDRESS | `부산항` | 지명/역명→주소 오분류 |
-| 20 | PERSON | `8517.12` | 일반명사→인물 오분류 |
-| 21 | PERSON | `2024-MIN-00913` | 일반명사→인물 오분류 |
-| 22 | ORGANIZATION | `하나` | 일반명사/약어→조직 오분류 |
-| 22 | ORGANIZATION | `밸류에이션` | 일반명사/약어→조직 오분류 |
-| 24 | ADDRESS | `신도림역` | 지명/역명→주소 오분류 |
-| 25 | PERSON | `EMP-0312` | 일반명사→인물 오분류 |
-| 27 | PERSON | `760312-2345671` | 일반명사→인물 오분류 |
-| 27 | ORGANIZATION | `신한` | 일반명사/약어→조직 오분류 |
-| 27 | PERSON | `0913` | 일반명사→인물 오분류 |
+| 21 | ADDRESS | `아파트 정문 앞 도로 파임` | 지명/역명→주소 오분류 |
+| 21 | ORGANIZATION | `도로` | 일반명사/약어→조직 오분류 |
+| 24 | ADDRESS | `신도림역 근처` | 지명/역명→주소 오분류 |
+| 25 | ORGANIZATION | `4대보험` | 일반명사/약어→조직 오분류 |
+| 25 | ORGANIZATION | `인사팀` | 일반명사/약어→조직 오분류 |
+| 26 | ADDRESS | `제주 서귀포시 중문관광로 72 호텔` | 지명/역명→주소 오분류 |
 | 29 | PHONE | `02-555-1234` | 유선번호(02-) — 사실상 정탐에 가까움 |
 
 > **패턴**: 진짜 오탐은 ① **코드 리뷰/로그 텍스트**(케이스 18·13·08)의 식별자·키워드를 NER가 인물/조직으로 오인, ② 일반명사('수익자'·'여권번호'·'네고')를 인물로 오인하는 데 집중. → 요구사항 §6.3의 **콘텐츠 클래스 게이팅(코드·base64는 NER 스킵)**을 적용하면 상당수 제거 가능.
@@ -148,33 +144,33 @@
 
 | # | 제목 | PII | 검출 | 미검출 | 진짜오탐 | block |
 | --: | :-- | --: | --: | --: | --: | :--: |
-| 01 | 고객 상담 메모 | 7 | 7 | 0 | 1 | 🔴 |
+| 01 | 고객 상담 메모 | 7 | 7 | 0 | 0 | 🔴 |
 | 02 | 개발자 슬랙 메시지 (시크릿 유출) | 5 | 5 | 0 | 2 | 🔴 |
-| 03 | 병원 접수 안내 이메일 | 7 | 7 | 0 | 0 | 🔴 |
-| 04 | 채용 지원 서류 요약 | 8 | 7 | 1 | 0 | 🔴 |
+| 03 | 병원 접수 안내 이메일 | 7 | 7 | 0 | 1 | 🔴 |
+| 04 | 채용 지원 서류 요약 | 8 | 8 | 0 | 0 | 🔴 |
 | 05 | 택배 분실 문의 (비표준 계좌 — 갭) | 7 | 7 | 0 | 1 | 🔴 |
-| 06 | 부동산 계약 메모 | 9 | 9 | 0 | 2 | 🔴 |
+| 06 | 부동산 계약 메모 | 9 | 9 | 0 | 1 | 🔴 |
 | 07 | 외국인 직원 인사 등록 | 7 | 7 | 0 | 1 | 🔴 |
 | 08 | 회의록 (tool_result 시뮬레이션) | 5 | 5 | 0 | 0 | 🔴 |
-| 09 | 은행 콜센터 스크립트 (한글 비번 라벨 — 갭) | 7 | 7 | 0 | 2 | 🔴 |
-| 10 | 개인 일기 (문맥형 PII) | 6 | 6 | 0 | 3 | — |
+| 09 | 은행 콜센터 스크립트 (한글 비번 라벨 — 갭) | 7 | 7 | 0 | 3 | 🔴 |
+| 10 | 개인 일기 (문맥형 PII) | 6 | 5 | 1 | 3 | — |
 | 11 | 온라인 쇼핑 주문 확인 | 5 | 5 | 0 | 0 | 🔴 |
 | 12 | 법률 상담 요청서 | 8 | 8 | 0 | 0 | 🔴 |
-| 13 | DevOps 인시던트 리포트 | 4 | 3 | 1 | 1 | 🔴 |
-| 14 | 학원 등록 상담 | 8 | 8 | 0 | 0 | 🔴 |
-| 15 | 환자 차트 인계 노트 | 7 | 6 | 1 | 1 | — |
-| 16 | 프리랜서 계약/정산 | 6 | 6 | 0 | 1 | — |
+| 13 | DevOps 인시던트 리포트 | 4 | 4 | 0 | 0 | 🔴 |
+| 14 | 학원 등록 상담 | 8 | 8 | 0 | 1 | 🔴 |
+| 15 | 환자 차트 인계 노트 | 7 | 6 | 1 | 0 | — |
+| 16 | 프리랜서 계약/정산 | 6 | 6 | 0 | 0 | — |
 | 17 | 보험 가입 설계 | 8 | 8 | 0 | 0 | 🔴 |
-| 18 | 코드 리뷰 코멘트 (코드+PII 혼합) | 5 | 5 | 0 | 0 | 🔴 |
-| 19 | 동호회 회원 명부 | 10 | 7 | 3 | 1 | — |
-| 20 | 수출 통관 서류 | 6 | 6 | 0 | 3 | — |
-| 21 | 민원 접수 (관공서) | 5 | 5 | 0 | 1 | 🔴 |
-| 22 | 스타트업 투자 메모 (혼합 영문) | 8 | 8 | 0 | 2 | 🔴 |
+| 18 | 코드 리뷰 코멘트 (코드+PII 혼합) | 5 | 5 | 0 | 1 | 🔴 |
+| 19 | 동호회 회원 명부 | 10 | 7 | 3 | 2 | — |
+| 20 | 수출 통관 서류 | 6 | 6 | 0 | 1 | — |
+| 21 | 민원 접수 (관공서) | 5 | 5 | 0 | 2 | 🔴 |
+| 22 | 스타트업 투자 메모 (혼합 영문) | 8 | 7 | 1 | 0 | 🔴 |
 | 23 | 졸업생 추천서 | 6 | 6 | 0 | 0 | — |
 | 24 | 중고거래 채팅 | 5 | 5 | 0 | 1 | — |
-| 25 | 급여 명세 발송 | 6 | 6 | 0 | 1 | 🔴 |
-| 26 | 여행 예약 확정 | 6 | 6 | 0 | 0 | 🔴 |
-| 27 | 전세 대출 상담 (민감 집약) | 10 | 9 | 1 | 3 | 🔴 |
+| 25 | 급여 명세 발송 | 6 | 6 | 0 | 2 | 🔴 |
+| 26 | 여행 예약 확정 | 6 | 6 | 0 | 1 | 🔴 |
+| 27 | 전세 대출 상담 (민감 집약) | 10 | 9 | 1 | 0 | 🔴 |
 | 28 | AI 챗봇 대화 로그 (은연중 유출) | 7 | 7 | 0 | 0 | 🔴 |
 | 29 | 비표준 포맷 집중 (약점 노출) | 6 | 6 | 0 | 1 | — |
 | 30 | 복합 업무 메일 (총정리) | 10 | 10 | 0 | 0 | 🔴 |
@@ -208,7 +204,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(7)**: `PERSON`=김서연, `PHONE`=010-3344-5566, `EMAIL`=seoyeon.kim@gmail.com, `RRN`=920723-1641620, `ADDRESS`=서울 마포구 월드컵북로 120, `KR_ACCOUNT`=123456-78-901234, `CARD`=4111-1111-1111-1111
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `PERSON`=ORD-20240613-0091
+- ⚠️ **진짜 오탐**: —
 
 ### [02] 개발자 슬랙 메시지 (시크릿 유출)
 
@@ -218,7 +214,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(5)**: `AWS_SECRET`=AKIAIOSFODNN7EXAMPLE, `API_KEY`=sk-abcdefghijklmnopqrstuvwxyz1234567890, `API_KEY`=ghp_1234567890abcdefghijklmnopqrstuvwxyz12, `PASSWORD`=Sup3rSecret!2024, `PERSON`=박지훈
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `PERSON`=v2.3.1, `HOSTNAME`=wiki.internal
+- ⚠️ **진짜 오탐**: `ORGANIZATION`=인프라팀, `HOSTNAME`=wiki.internal
 
 ### [03] 병원 접수 안내 이메일
 
@@ -228,7 +224,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(7)**: `PERSON`=이도현, `PHONE`=010-7788-9900, `RRN`=770123-4279267, `EMAIL`=dohyun.lee@daum.net, `ADDRESS`=서울 송파구 올림픽로 300, `CARD`=5500-0055-5555-5559, `PERSON`=최민호
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: —
+- ⚠️ **진짜 오탐**: `ORGANIZATION`=정형외
 
 ### [04] 채용 지원 서류 요약
 
@@ -236,8 +232,8 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 > 지원자 정보 정리합니다. 이름 강하늘, 휴대폰 010-2233-4455, 이메일 haneul.kang@kakao.com. 현 주소는 경기도 성남시 분당구 판교역로 235 이고, 전 직장은 네이버였습니다. 포트폴리오는 깃헙 https://github.com/haneulk 에 있고, 비상연락망으로 부친 010-9001-2002 도 받았습니다. 여권번호 M12345678 (해외 출장 이력 확인용), 운전면허 11-19-123456-01 소지. 희망 연봉은 6,500만원, 입사 가능일 7월 1일. 학력은 2015년 졸업입니다.
 
-- ✅ **검출(7)**: `PERSON`=강하늘, `PHONE`=010-2233-4455, `EMAIL`=haneul.kang@kakao.com, `ADDRESS`=경기도 성남시 분당구 판교역로 235, `PHONE`=010-9001-2002, `PASSPORT`=M12345678, `DRIVER_LICENSE`=11-19-123456-01
-- ❌ **미검출(1)**: `ORGANIZATION`=네이버
+- ✅ **검출(8)**: `PERSON`=강하늘, `PHONE`=010-2233-4455, `EMAIL`=haneul.kang@kakao.com, `ADDRESS`=경기도 성남시 분당구 판교역로 235, `ORGANIZATION`=네이버, `PHONE`=010-9001-2002, `PASSPORT`=M12345678, `DRIVER_LICENSE`=11-19-123456-01
+- ❌ **미검출(0)**: —
 - ⚠️ **진짜 오탐**: —
 
 ### [05] 택배 분실 문의 (비표준 계좌 — 갭)
@@ -258,7 +254,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(9)**: `PERSON`=한상우, `PHONE`=010-1212-3434, `PERSON`=오세훈, `PHONE`=010-5656-7878, `ADDRESS`=서울 강남구 도곡로 401, `RRN`=340128-1381696, `KR_ACCOUNT`=1002-345-678901, `BIZ_NO`=469-80-91148, `EMAIL`=sangwoo.han@gmail.com
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `ORGANIZATION`=대박공인중개사, `PERSON`=18억 5천
+- ⚠️ **진짜 오탐**: `ORGANIZATION`=대박공인중개사
 
 ### [07] 외국인 직원 인사 등록
 
@@ -268,7 +264,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(7)**: `PERSON`=존스미스, `FOREIGN_REG`=900101-5234567, `PHONE`=010-4040-5050, `EMAIL`=john.smith@company.io, `ADDRESS`=서울 용산구 이태원로 200, `PASSPORT`=S98765432, `KR_ACCOUNT`=123456-78-901234
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `PERSON`=EMP-2024-0312
+- ⚠️ **진짜 오탐**: `ORGANIZATION`=글로벌사업팀이며
 
 ### [08] 회의록 (tool_result 시뮬레이션)
 
@@ -288,7 +284,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(7)**: `PERSON`=배수지, `PHONE`=010-7070-8080, `PASSWORD`=SecurePw99, `RRN`=010809-2201058, `ADDRESS`=대전 유성구 대학로 99, `KR_ACCOUNT`=110-123456-78901, `EMAIL`=suji.bae@hanmail.net
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `ORGANIZATION`=신한, `PERSON`=1588-0000
+- ⚠️ **진짜 오탐**: `PERSON`=고객, `PERSON`=고객, `ORGANIZATION`=인터넷뱅킹
 
 ### [10] 개인 일기 (문맥형 PII)
 
@@ -296,9 +292,9 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 > 오랜만에 대학 동기 모임에 다녀왔다. 민준이랑 서윤이는 여전했고, 특히 박건우는 삼성전자 들어갔다고 자랑하더라. 나는 다음 주에 카카오 면접이 있어서 좀 긴장된다. 집에 오는 길에 강남역 근처에서 우연히 옛 직장 상사 김태형 부장님을 만났는데, 연락처 받아뒀다. 010-3030-2020. 다음에 밥 한번 먹기로 했다. 요즘 사는 동네 서초구 반포대로 58 은 조용하고 좋다. 내일은 운동 좀 해야지.
 
-- ✅ **검출(6)**: `PERSON`=박건우, `ORGANIZATION`=삼성전자, `ORGANIZATION`=카카오, `PERSON`=김태형, `PHONE`=010-3030-2020, `ADDRESS`=서초구 반포대로 58
-- ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `PERSON`=민준이랑, `PERSON`=서윤, `ADDRESS`=강남역
+- ✅ **검출(5)**: `ORGANIZATION`=삼성전자, `ORGANIZATION`=카카오, `PERSON`=김태형, `PHONE`=010-3030-2020, `ADDRESS`=서초구 반포대로 58
+- ❌ **미검출(1)**: `PERSON`=박건우
+- ⚠️ **진짜 오탐**: `ORGANIZATION`=대학 동기 모임, `PERSON`=민준이랑 서윤이, `ADDRESS`=강남역 근처
 
 ### [11] 온라인 쇼핑 주문 확인
 
@@ -326,9 +322,9 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 > 장애 보고: 02시 14분 결제 API 오류 급증. 원인은 만료된 인증서와 유출된 자격증명입니다. 유출된 프라이빗 키 일부: -----BEGIN RSA PRIVATE KEY----- MIIBOgIBAAJBAKj34GkxFh -----END RSA PRIVATE KEY----- 그리고 슬랙 웹훅에 박힌 토큰 ghp_abcdEFGH1234567890ijklMNOP1234567890qZ 발견. 대응 담당 한지민, 비상 연락 010-9999-8888. 영향받은 고객 약 1,200명. 롤백 버전은 release-2024.06.13. 사후 분석 회의는 내일 10시입니다.
 
-- ✅ **검출(3)**: `PRIVATE_KEY`=-----BEGIN RSA PRIVATE KEY-----, `API_KEY`=ghp_abcdEFGH1234567890ijklMNOP1234567890qZ, `PHONE`=010-9999-8888
-- ❌ **미검출(1)**: `PERSON`=한지민
-- ⚠️ **진짜 오탐**: `PERSON`=약 1,200명
+- ✅ **검출(4)**: `PRIVATE_KEY`=-----BEGIN RSA PRIVATE KEY-----, `API_KEY`=ghp_abcdEFGH1234567890ijklMNOP1234567890qZ, `PERSON`=한지민, `PHONE`=010-9999-8888
+- ❌ **미검출(0)**: —
+- ⚠️ **진짜 오탐**: —
 
 ### [14] 학원 등록 상담
 
@@ -338,7 +334,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(8)**: `PERSON`=최서진, `PERSON`=최영수, `PHONE`=010-4545-6767, `PHONE`=010-7654-3210, `ADDRESS`=대구 수성구 동대구로 23, `CARD`=5500-0055-5555-5559, `KR_ACCOUNT`=123456-78-901234, `EMAIL`=youngsoo.choi@gmail.com
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: —
+- ⚠️ **진짜 오탐**: `ORGANIZATION`=수학 단
 
 ### [15] 환자 차트 인계 노트
 
@@ -348,7 +344,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(6)**: `PERSON`=권나라, `PHONE`=010-1313-2424, `PERSON`=정우성, `ADDRESS`=서울 종로구 종로 1, `EMAIL`=nara.kwon@medi.kr, `PHONE`=010-5151-6262
 - ❌ **미검출(1)**: `RRN`=760312-2345671
-- ⚠️ **진짜 오탐**: `PERSON`=760312-2345671
+- ⚠️ **진짜 오탐**: —
 
 ### [16] 프리랜서 계약/정산
 
@@ -358,7 +354,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(6)**: `PERSON`=남도일, `BIZ_NO`=010-24-69680, `KR_ACCOUNT`=3333-01-1234567, `EMAIL`=doil.nam@gmail.com, `PHONE`=010-3636-4747, `ADDRESS`=서울 영등포구 여의대로 24
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `PERSON`=INV-0613
+- ⚠️ **진짜 오탐**: —
 
 ### [17] 보험 가입 설계
 
@@ -378,7 +374,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(5)**: `API_KEY`=sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV, `EMAIL`=customer.report@bizmail.com, `PERSON`=류현진, `PHONE`=010-1010-2020, `PASSWORD`=devpass2024!
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: —
+- ⚠️ **진짜 오탐**: `PERSON`=고객
 
 ### [19] 동호회 회원 명부
 
@@ -388,7 +384,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(7)**: `PERSON`=서지호, `PHONE`=010-1122-3344, `ADDRESS`=서울 노원구 동일로 1414, `PERSON`=백승호, `PHONE`=010-9988-7766, `KR_ACCOUNT`=110-123456-78901, `EMAIL`=jiho.seo@gmail.com
 - ❌ **미검출(3)**: `PERSON`=문가영, `PHONE`=010-5566-1122, `ADDRESS`=경기 고양시 일산동구 중앙로 1275
-- ⚠️ **진짜 오탐**: `ORGANIZATION`=신한
+- ⚠️ **진짜 오탐**: `ORGANIZATION`=테니스 동호회, `ADDRESS`=양재 시민의 숲 코트입니다
 
 ### [20] 수출 통관 서류
 
@@ -398,7 +394,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(6)**: `ORGANIZATION`=한빛무역, `BIZ_NO`=887-13-78905, `PERSON`=오지환, `PHONE`=010-3434-5656, `EMAIL`=jihwan.oh@hanbit.co.kr, `KR_ACCOUNT`=123456-78-901234
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `ADDRESS`=미국, `ADDRESS`=부산항, `PERSON`=8517.12
+- ⚠️ **진짜 오탐**: `ADDRESS`=부산항
 
 ### [21] 민원 접수 (관공서)
 
@@ -408,7 +404,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(5)**: `PERSON`=강도영, `PHONE`=010-6767-8989, `ADDRESS`=세종특별자치시 한누리대로 2130, `RRN`=920723-1641620, `EMAIL`=doyoung.kang@korea.kr
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `PERSON`=2024-MIN-00913
+- ⚠️ **진짜 오탐**: `ADDRESS`=아파트 정문 앞 도로 파임, `ORGANIZATION`=도로
 
 ### [22] 스타트업 투자 메모 (혼합 영문)
 
@@ -416,9 +412,9 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 > 시드 라운드 검토 노트입니다. 대표 Kevin Park(박준혁), 연락처 010-2020-3030. 회사는 클라우드비전, 사업자번호 469-80-91148. pitch deck는 kevin@cloudvision.io 로 받았습니다. 은행 계좌(에스크로) 하나 1002-345-678901. 법인 주소 서울 강남구 테헤란로 521. 기술 데모 서버 접속 토큰 AKIAIOSFODNN7EXAMPLE 이 메일에 그대로 와서 보안 지적했습니다. 밸류에이션 80억, 지분 12% 협의 중. 다음 미팅 6월 19일.
 
-- ✅ **검출(8)**: `PERSON`=박준혁, `PHONE`=010-2020-3030, `ORGANIZATION`=클라우드비전, `BIZ_NO`=469-80-91148, `EMAIL`=kevin@cloudvision.io, `KR_ACCOUNT`=1002-345-678901, `ADDRESS`=서울 강남구 테헤란로 521, `AWS_SECRET`=AKIAIOSFODNN7EXAMPLE
-- ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `ORGANIZATION`=하나, `ORGANIZATION`=밸류에이션
+- ✅ **검출(7)**: `PHONE`=010-2020-3030, `ORGANIZATION`=클라우드비전, `BIZ_NO`=469-80-91148, `EMAIL`=kevin@cloudvision.io, `KR_ACCOUNT`=1002-345-678901, `ADDRESS`=서울 강남구 테헤란로 521, `AWS_SECRET`=AKIAIOSFODNN7EXAMPLE
+- ❌ **미검출(1)**: `PERSON`=박준혁
+- ⚠️ **진짜 오탐**: —
 
 ### [23] 졸업생 추천서
 
@@ -438,7 +434,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(5)**: `ADDRESS`=서울 구로구 경인로 662, `PERSON`=임수호, `PHONE`=010-4321-8765, `KR_ACCOUNT`=3333-02-7654321, `EMAIL`=sooho.lim@gmail.com
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `ADDRESS`=신도림역
+- ⚠️ **진짜 오탐**: `ADDRESS`=신도림역 근처
 
 ### [25] 급여 명세 발송
 
@@ -448,7 +444,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(6)**: `PERSON`=조민서, `KR_ACCOUNT`=123456-78-901234, `RRN`=770123-4279267, `EMAIL`=minseo.cho@corp.com, `PHONE`=010-1357-2468, `ADDRESS`=경기 수원시 영통구 광교중앙로 145
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: `PERSON`=EMP-0312
+- ⚠️ **진짜 오탐**: `ORGANIZATION`=4대보험, `ORGANIZATION`=인사팀
 
 ### [26] 여행 예약 확정
 
@@ -458,7 +454,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(6)**: `PERSON`=손흥민, `PHONE`=010-7000-8000, `PASSPORT`=M12345678, `ADDRESS`=제주 서귀포시 중문관광로 72, `CARD`=4111-1111-1111-1111, `EMAIL`=heungmin.son@gmail.com
 - ❌ **미검출(0)**: —
-- ⚠️ **진짜 오탐**: —
+- ⚠️ **진짜 오탐**: `ADDRESS`=제주 서귀포시 중문관광로 72 호텔
 
 ### [27] 전세 대출 상담 (민감 집약)
 
@@ -468,7 +464,7 @@ PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
 
 - ✅ **검출(9)**: `PERSON`=김연아, `ORGANIZATION`=현대자동차, `PHONE`=010-2468-1357, `EMAIL`=yuna.kim@hmail.com, `ADDRESS`=서울 송파구 백제고분로 50, `KR_ACCOUNT`=110-123456-78901, `PERSON`=이상화, `DRIVER_LICENSE`=11-19-123456-01, `PERSON`=박명수
 - ❌ **미검출(1)**: `RRN`=760312-2345671
-- ⚠️ **진짜 오탐**: `PERSON`=760312-2345671, `ORGANIZATION`=신한, `PERSON`=0913
+- ⚠️ **진짜 오탐**: —
 
 ### [28] AI 챗봇 대화 로그 (은연중 유출)
 

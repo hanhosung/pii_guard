@@ -1,15 +1,15 @@
 # 외부 LLM(Codex) 생성 테스트 결과 — PII-Guard 검출 · GLiNER 엔진 (2026-06-23)
 
 > 입력: `codex_cases.json` (10항목) · 외부 LLM(Codex 등) 생성 텍스트를 PII-Guard에 입력해 채점. 입력 텍스트는 spaCy 리포트 부록에서 재구성(동일 데이터).
-> 엔진: Stage1(정규식·체크섬) + Stage2 NER(GLiNER · taeminlee/gliner_ko) + proximity · 20 카테고리.
+> 엔진: Stage1(정규식·체크섬) + Stage2 NER(GLiNER · urchade/gliner_multi_pii-v1) + proximity · 20 카테고리.
 
 ## 1. 핵심 결과
 
 | 지표 | 수치 |
 | :-- | :-- |
-| **재현율(Recall)** | **0.843**  (75/89) |
-| **정밀도(Precision)** | **0.676**  (75/111) |
-| 검출 TP / 미검출 FN / 오탐후보 FP | 75 / 14 / 36 |
+| **재현율(Recall)** | **0.854**  (76/89) |
+| **정밀도(Precision)** | **0.927**  (76/82) |
+| 검출 TP / 미검출 FN / 오탐후보 FP | 76 / 13 / 6 |
 
 > ※ 오탐후보(FP)에는 ground truth에 라벨 안 된 실제 PII(은행명 등)나 NER 변동분이 섞일 수 있으니, 아래 §4 부록의 항목별 오탐 목록을 검토해 진짜 over-masking과 구분하세요.
 
@@ -27,7 +27,7 @@
 | GCP_KEY | 1 | 0 | 1.00 |
 | KR_ACCOUNT | 4 | 6 | 0.40 ⚠️ |
 | PASSPORT | 0 | 3 | 0.00 ⚠️ |
-| PASSWORD | 1 | 2 | 0.33 ⚠️ |
+| PASSWORD | 2 | 1 | 0.67 ⚠️ |
 | PERSON | 10 | 0 | 1.00 |
 | PHONE | 10 | 0 | 1.00 |
 | PRIVATE_KEY | 1 | 0 | 1.00 |
@@ -38,16 +38,16 @@
 
 | # | 제목 | 길이 | 심은 | 검출 | 미검출 | 오탐 | block |
 | --: | :-- | --: | --: | --: | --: | --: | :--: |
-| 1 | VOC 01 · 결제오류 | 505 | 8 | 6 | 2 | 7 | 🔴 |
-| 2 | VOC 02 · 회원정보 정정 | 501 | 8 | 8 | 0 | 4 | 🔴 |
+| 1 | VOC 01 · 결제오류 | 505 | 8 | 7 | 1 | 1 | 🔴 |
+| 2 | VOC 02 · 회원정보 정정 | 501 | 8 | 8 | 0 | 3 | 🔴 |
 | 3 | VOC 03 · 배송지 변경 | 488 | 10 | 8 | 2 | 1 | 🔴 |
-| 4 | VOC 04 · 환불 지연 | 512 | 8 | 7 | 1 | 3 | 🔴 |
-| 5 | VOC 05 · 사업자 세금계산서 | 468 | 9 | 8 | 1 | 3 | 🔴 |
-| 6 | VOC 06 · 로그인 잠김 | 457 | 9 | 7 | 2 | 3 | 🔴 |
-| 7 | VOC 07 · 예약 취소 | 434 | 8 | 7 | 1 | 2 | 🔴 |
-| 8 | VOC 08 · 카드 재등록 | 515 | 9 | 8 | 1 | 3 | 🔴 |
-| 9 | VOC 09 · 정기구독 해지 | 455 | 10 | 9 | 1 | 3 | 🔴 |
-| 10 | VOC 10 · 반품 수거 | 487 | 10 | 7 | 3 | 7 | 🔴 |
+| 4 | VOC 04 · 환불 지연 | 512 | 8 | 7 | 1 | 1 | 🔴 |
+| 5 | VOC 05 · 사업자 세금계산서 | 468 | 9 | 8 | 1 | 0 | 🔴 |
+| 6 | VOC 06 · 로그인 잠김 | 457 | 9 | 7 | 2 | 0 | 🔴 |
+| 7 | VOC 07 · 예약 취소 | 434 | 8 | 7 | 1 | 0 | 🔴 |
+| 8 | VOC 08 · 카드 재등록 | 515 | 9 | 8 | 1 | 0 | 🔴 |
+| 9 | VOC 09 · 정기구독 해지 | 455 | 10 | 9 | 1 | 0 | 🔴 |
+| 10 | VOC 10 · 반품 수거 | 487 | 10 | 7 | 3 | 0 | 🔴 |
 
 ## 4. 부록 — 전체 항목(텍스트·검출/미검출)
 
@@ -58,9 +58,9 @@
 ```
 
 - **심은(8)**: `PERSON`=김하린, `PHONE`=010-4821-7390, `EMAIL`=harin.kim27@gmail.com, `RRN`=710310-4151262, `CARD`=4485-2538-8853-9336, `KR_ACCOUNT`=302-04-918274, `ADDRESS`=서울특별시 마포구 월드컵북로 15길 22, 302호, `PASSWORD`=tempPay!2026
-- ✅ **검출(6)**: `PERSON`=김하린, `PHONE`=010-4821-7390, `EMAIL`=harin.kim27@gmail.com, `RRN`=710310-4151262, `CARD`=4485-2538-8853-9336, `ADDRESS`=서울특별시 마포구 월드컵북로 15길 22, 302호
-- ❌ **미검출(2)**: `KR_ACCOUNT`=302-04-918274, `PASSWORD`=tempPay!2026
-- ⚠️ **오탐후보(7)**: `PERSON`=ORD-2024-0613, `PERSON`=v1.2.3, `ORGANIZATION`=국민은행, `PERSON`=302-04-918274, `PERSON`=김하린, `PERSON`=tempPay!2026, `PERSON`=CASE-88A-119
+- ✅ **검출(7)**: `PERSON`=김하린, `PHONE`=010-4821-7390, `EMAIL`=harin.kim27@gmail.com, `RRN`=710310-4151262, `CARD`=4485-2538-8853-9336, `ADDRESS`=서울특별시 마포구 월드컵북로 15길 22, 302호, `PASSWORD`=tempPay!2026
+- ❌ **미검출(1)**: `KR_ACCOUNT`=302-04-918274
+- ⚠️ **오탐후보(1)**: `PERSON`=김하린입니다
 
 ### [2] VOC 02 · 회원정보 정정  (501자) · 🔴 block
 
@@ -71,7 +71,7 @@
 - **심은(8)**: `PERSON`=박서준, `PHONE`=010-9354-1186, `EMAIL`=seojoon.park@naver.com, `RRN`=940413-4961351, `ADDRESS`=경기도 성남시 분당구 판교역로 180, 8층 804호, `KR_ACCOUNT`=110-398-475612, `BIZ_NO`=434-67-77758, `API_KEY`=sk-test_9pQmR8xYvN2aL6bC0dE3fG
 - ✅ **검출(8)**: `PERSON`=박서준, `PHONE`=010-9354-1186, `EMAIL`=seojoon.park@naver.com, `RRN`=940413-4961351, `ADDRESS`=경기도 성남시 분당구 판교역로 180, 8층 804호, `KR_ACCOUNT`=110-398-475612, `BIZ_NO`=434-67-77758, `API_KEY`=sk-test_9pQmR8xYvN2aL6bC0dE3fG
 - ❌ **미검출(0)**: —
-- ⚠️ **오탐후보(4)**: `PERSON`=박서준-1, `ORGANIZATION`=신한은행, `PERSON`=박서준, `PERSON`=REF-0000-2026
+- ⚠️ **오탐후보(3)**: `PERSON`=박서준-1처럼, `ORGANIZATION`=신한은행, `PERSON`=박서준입니다
 
 ### [3] VOC 03 · 배송지 변경  (488자) · 🔴 block
 
@@ -82,7 +82,7 @@
 - **심은(10)**: `PERSON`=이도윤, `PHONE`=010-2765-9041, `EMAIL`=doyun.lee@example.com, `ADDRESS`=부산광역시 해운대구 센텀중앙로 97, A동 1201호, `ADDRESS`=대구광역시 수성구 달구벌대로 2450, 5층, `PASSPORT`=M48291375, `RRN`=120923-1591783, `CARD`=4633-8750-0474-3953, `KR_ACCOUNT`=1002-845-391027, `API_KEY`=ghp_7KqL2mN9sP4vX8aB1cD3eF5gH6jR
 - ✅ **검출(8)**: `PERSON`=이도윤, `PHONE`=010-2765-9041, `EMAIL`=doyun.lee@example.com, `ADDRESS`=부산광역시 해운대구 센텀중앙로 97, A동 1201호, `ADDRESS`=대구광역시 수성구 달구벌대로 2450, 5층, `RRN`=120923-1591783, `CARD`=4633-8750-0474-3953, `KR_ACCOUNT`=1002-845-391027
 - ❌ **미검출(2)**: `PASSPORT`=M48291375, `API_KEY`=ghp_7KqL2mN9sP4vX8aB1cD3eF5gH6jR
-- ⚠️ **오탐후보(1)**: `ORGANIZATION`=우리은행
+- ⚠️ **오탐후보(1)**: `ORGANIZATION`=회사
 
 ### [4] VOC 04 · 환불 지연  (512자) · 🔴 block
 
@@ -93,7 +93,7 @@
 - **심은(8)**: `PERSON`=최민서, `PHONE`=010-6642-8305, `EMAIL`=minseo.choi@gmail.com, `CARD`=4755-1313-7353-7994, `KR_ACCOUNT`=351-910284-77207, `DRIVER_LICENSE`=11-19-123456-01, `ADDRESS`=인천광역시 연수구 컨벤시아대로 165, 1903동 1702호, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fakePayload2026.fakeSign
 - ✅ **검출(7)**: `PERSON`=최민서, `PHONE`=010-6642-8305, `EMAIL`=minseo.choi@gmail.com, `CARD`=4755-1313-7353-7994, `KR_ACCOUNT`=351-910284-77207, `DRIVER_LICENSE`=11-19-123456-01, `ADDRESS`=인천광역시 연수구 컨벤시아대로 165, 1903동 1702호
 - ❌ **미검출(1)**: `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fakePayload2026.fakeSign
-- ⚠️ **오탐후보(3)**: `ORGANIZATION`=하나은행, `PERSON`=최민서, `PERSON`=E-4010
+- ⚠️ **오탐후보(1)**: `PERSON`=최민서입니다
 
 ### [5] VOC 05 · 사업자 세금계산서  (468자) · 🔴 block
 
@@ -104,7 +104,7 @@
 - **심은(9)**: `PERSON`=정유나, `PHONE`=010-7188-2460, `EMAIL`=yuna.jung@companymail.co.kr, `BIZ_NO`=189-24-78001, `KR_ACCOUNT`=302-1834-5567-11, `RRN`=910722-3023658, `ADDRESS`=광주광역시 서구 상무중앙로 90, 12층, `CARD`=4075-1163-7265-1675, `GCP_KEY`=AIzaSyD9q7KlmN4pQ2rT6uV8wX0yZ1aBcDeFgHi
 - ✅ **검출(8)**: `PERSON`=정유나, `PHONE`=010-7188-2460, `EMAIL`=yuna.jung@companymail.co.kr, `BIZ_NO`=189-24-78001, `RRN`=910722-3023658, `ADDRESS`=광주광역시 서구 상무중앙로 90, 12층, `CARD`=4075-1163-7265-1675, `GCP_KEY`=AIzaSyD9q7KlmN4pQ2rT6uV8wX0yZ1aBcDeFgHi
 - ❌ **미검출(1)**: `KR_ACCOUNT`=302-1834-5567-11
-- ⚠️ **오탐후보(3)**: `ORGANIZATION`=농협, `PERSON`=302-1834-5567-11, `PERSON`=P-4455
+- ⚠️ **오탐후보(0)**: —
 
 ### [6] VOC 06 · 로그인 잠김  (457자) · 🔴 block
 
@@ -115,7 +115,7 @@
 - **심은(9)**: `PERSON`=한지우, `PHONE`=010-4093-5728, `EMAIL`=jiwoo.han@outlook.com, `PASSWORD`=Hjw!0623Reset, `PASSPORT`=S73820491, `RRN`=700523-4376198, `ADDRESS`=울산광역시 남구 삼산로 261, 701호, `KR_ACCOUNT`=3333-22-9081745, `CARD`=4612-2202-9729-9758
 - ✅ **검출(7)**: `PERSON`=한지우, `PHONE`=010-4093-5728, `EMAIL`=jiwoo.han@outlook.com, `RRN`=700523-4376198, `ADDRESS`=울산광역시 남구 삼산로 261, 701호, `KR_ACCOUNT`=3333-22-9081745, `CARD`=4612-2202-9729-9758
 - ❌ **미검출(2)**: `PASSWORD`=Hjw!0623Reset, `PASSPORT`=S73820491
-- ⚠️ **오탐후보(3)**: `PERSON`=SESS-000123, `PERSON`=3.4.5, `PERSON`=ABCD-9999
+- ⚠️ **오탐후보(0)**: —
 
 ### [7] VOC 07 · 예약 취소  (434자) · 🔴 block
 
@@ -126,7 +126,7 @@
 - **심은(8)**: `PERSON`=강태오, `PHONE`=010-8420-3157, `EMAIL`=taeo.kang@gmail.com, `RRN`=940413-4961351, `CARD`=4485-2538-8853-9336, `KR_ACCOUNT`=1000-5821-7743, `ADDRESS`=제주특별자치도 제주시 연삼로 41, 2층, `AWS_SECRET`=AKIA8N6Q2R5T7Y1U3I9O
 - ✅ **검출(7)**: `PERSON`=강태오, `PHONE`=010-8420-3157, `EMAIL`=taeo.kang@gmail.com, `RRN`=940413-4961351, `CARD`=4485-2538-8853-9336, `ADDRESS`=제주특별자치도 제주시 연삼로 41, 2층, `AWS_SECRET`=AKIA8N6Q2R5T7Y1U3I9O
 - ❌ **미검출(1)**: `KR_ACCOUNT`=1000-5821-7743
-- ⚠️ **오탐후보(2)**: `PERSON`=1000-5821-7743, `PERSON`=BK-2026-JEJU-15
+- ⚠️ **오탐후보(0)**: —
 
 ### [8] VOC 08 · 카드 재등록  (515자) · 🔴 block
 
@@ -139,7 +139,7 @@ MIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJe
 - **심은(9)**: `PERSON`=문채원, `PHONE`=010-5917-6402, `EMAIL`=chaewon.moon@example.net, `CARD`=4633-8750-0474-3953, `DRIVER_LICENSE`=11-19-123456-01, `RRN`=120923-1591783, `ADDRESS`=서울특별시 강남구 테헤란로 152, 27층, `KR_ACCOUNT`=024-991827-03-011, `PRIVATE_KEY`=-----BEGIN PRIVATE KEY-----
 - ✅ **검출(8)**: `PERSON`=문채원, `PHONE`=010-5917-6402, `EMAIL`=chaewon.moon@example.net, `CARD`=4633-8750-0474-3953, `DRIVER_LICENSE`=11-19-123456-01, `RRN`=120923-1591783, `ADDRESS`=서울특별시 강남구 테헤란로 152, 27층, `PRIVATE_KEY`=-----BEGIN PRIVATE KEY-----
 - ❌ **미검출(1)**: `KR_ACCOUNT`=024-991827-03-011
-- ⚠️ **오탐후보(3)**: `ORGANIZATION`=기업은행, `PERSON`=024-991827-03-011, `PERSON`=BIN 463387
+- ⚠️ **오탐후보(0)**: —
 
 ### [9] VOC 09 · 정기구독 해지  (455자) · 🔴 block
 
@@ -150,7 +150,7 @@ MIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJe
 - **심은(10)**: `PERSON`=오세훈, `PHONE`=010-2246-8891, `EMAIL`=sehun.oh@naver.com, `CARD`=4755-1313-7353-7994, `KR_ACCOUNT`=9002-1847-6603-8, `RRN`=710310-4151262, `ADDRESS`=대전광역시 유성구 대학로 99, 4동 303호, `BIZ_NO`=688-17-36719, `PASSWORD`=CancelMe#2026, `API_KEY`=sk-live_4aB7cD9eF2gH5iJ8kL1mN3pQ
 - ✅ **검출(9)**: `PERSON`=오세훈, `PHONE`=010-2246-8891, `EMAIL`=sehun.oh@naver.com, `CARD`=4755-1313-7353-7994, `RRN`=710310-4151262, `ADDRESS`=대전광역시 유성구 대학로 99, 4동 303호, `BIZ_NO`=688-17-36719, `PASSWORD`=CancelMe#2026, `API_KEY`=sk-live_4aB7cD9eF2gH5iJ8kL1mN3pQ
 - ❌ **미검출(1)**: `KR_ACCOUNT`=9002-1847-6603-8
-- ⚠️ **오탐후보(3)**: `ORGANIZATION`=새마을금고, `PERSON`=9002-1847-6603-8, `PERSON`=SUB-2026-06-0009
+- ⚠️ **오탐후보(0)**: —
 
 ### [10] VOC 10 · 반품 수거  (487자) · 🔴 block
 
@@ -161,4 +161,4 @@ MIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJe
 - **심은(10)**: `PERSON`=배수빈, `PHONE`=010-3779-5214, `EMAIL`=subin.bae@gmail.com, `ADDRESS`=경상남도 창원시 성산구 중앙대로 100, 1505호, `CARD`=4075-1163-7265-1675, `KR_ACCOUNT`=101-2054-8876-09, `PASSPORT`=M90517264, `RRN`=910722-3023658, `BIZ_NO`=751-47-92277, `TOKEN`=eyJraWQiOiJwaWktZ3VhcmQiLCJhbGciOiJIUzI1NiJ9.subinReturn.payloadSign
 - ✅ **검출(7)**: `PERSON`=배수빈, `PHONE`=010-3779-5214, `EMAIL`=subin.bae@gmail.com, `ADDRESS`=경상남도 창원시 성산구 중앙대로 100, 1505호, `CARD`=4075-1163-7265-1675, `RRN`=910722-3023658, `BIZ_NO`=751-47-92277
 - ❌ **미검출(3)**: `KR_ACCOUNT`=101-2054-8876-09, `PASSPORT`=M90517264, `TOKEN`=eyJraWQiOiJwaWktZ3VhcmQiLCJhbGciOiJIUzI1NiJ9.subinReturn.payloadSign
-- ⚠️ **오탐후보(7)**: `ADDRESS`=창원시, `ADDRESS`=성산구, `ORGANIZATION`=부산은행, `PERSON`=101-2054-8876-09, `PERSON`=M90517264, `PERSON`=RTN-4455-2026, `PERSON`=1234-0000-5678
+- ⚠️ **오탐후보(0)**: —

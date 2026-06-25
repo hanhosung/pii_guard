@@ -36,13 +36,15 @@
 
 ### 설치
 ```bash
-# 가상환경 (Python 3.11 권장 — Presidio/spaCy)
+# 가상환경 (Python 3.11 권장)
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -e ".[ner,dev,ui]"
 
-# 한국어 NER 모델 (택1: lg 권장 / sm 경량)
-python -m spacy download ko_core_news_lg
+# Stage2 NER 백엔드 (택1 또는 둘 다)
+pip install -e ".[ner-gliner,dev,ui]"   # 기본 백엔드 GLiNER (Apache-2.0, 상업 가능) — 모델 자동 다운로드
+pip install -e ".[ner,dev,ui]"          # 경량 폴백 spaCy (Presidio)
+python -m spacy download ko_core_news_lg  # spaCy 폴백용 한국어 모델 (lg 권장 / sm 경량)
 ```
+> 백엔드 선택: `PIIGUARD_NER_BACKEND=gliner|spacy` (기본 `gliner`) 또는 정책 `stage2.ner_backend`. 모델 변형: `PIIGUARD_GLINER_MODEL` / `PIIGUARD_KO_SPACY_MODEL`. 상세·성능 비교 = [`validation/NER_BACKEND_COMPARISON.md`](validation/NER_BACKEND_COMPARISON.md).
 
 ### 1) 프록시 실행 — 실제 Anthropic 앞에 두기
 ```bash

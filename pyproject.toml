@@ -33,11 +33,14 @@ ner = [
 ]
 # Stage-2 NER backend "gliner" (default, recall-first): GLiNER + PyTorch.
 # Install with: pip install pii-guard[ner-gliner]
-# Korean-specific model is downloaded on first use; default taeminlee/gliner_ko,
-# overridable via PIIGUARD_GLINER_MODEL. Select the backend with
-# PIIGUARD_NER_BACKEND=gliner|spacy or policy stage2.ner_backend (R18 / ADR-11).
-# python-mecab-ko is the word splitter required by taeminlee/gliner_ko (bundled
-# mecab-ko dict — no system/Java install needed).
+# Default model urchade/gliner_multi_pii-v1 (Apache-2.0 — commercial use OK),
+# downloaded on first use; overridable via PIIGUARD_GLINER_MODEL. Select the
+# backend with PIIGUARD_NER_BACKEND=gliner|spacy or policy stage2.ner_backend
+# (R18 / ADR-11). Licensing: the gliner library is Apache-2.0; the default model
+# is Apache-2.0. NOTE: taeminlee/gliner_ko is CC-BY-NC-4.0 (non-commercial) — do
+# not use it as the default in a commercial product.
+# python-mecab-ko is only needed by models whose words_splitter is mecab-ko
+# (e.g. taeminlee/gliner_ko); harmless to keep installed for the default model.
 ner-gliner = [
     "gliner>=0.2",
     "torch>=2.0",

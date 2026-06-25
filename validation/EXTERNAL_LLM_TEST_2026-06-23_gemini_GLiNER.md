@@ -1,15 +1,15 @@
 # 외부 LLM(Gemini) 생성 테스트 결과 — PII-Guard 검출 · GLiNER 엔진 (2026-06-23)
 
 > 입력: `gemini_cases.json` (10항목) · 외부 LLM(Codex 등) 생성 텍스트를 PII-Guard에 입력해 채점. 입력 텍스트는 spaCy 리포트 부록에서 재구성(동일 데이터).
-> 엔진: Stage1(정규식·체크섬) + Stage2 NER(GLiNER · taeminlee/gliner_ko) + proximity · 20 카테고리.
+> 엔진: Stage1(정규식·체크섬) + Stage2 NER(GLiNER · urchade/gliner_multi_pii-v1) + proximity · 20 카테고리.
 
 ## 1. 핵심 결과
 
 | 지표 | 수치 |
 | :-- | :-- |
-| **재현율(Recall)** | **0.861**  (62/72) |
-| **정밀도(Precision)** | **0.816**  (62/76) |
-| 검출 TP / 미검출 FN / 오탐후보 FP | 62 / 10 / 14 |
+| **재현율(Recall)** | **0.847**  (61/72) |
+| **정밀도(Precision)** | **0.910**  (61/67) |
+| 검출 TP / 미검출 FN / 오탐후보 FP | 61 / 11 / 6 |
 
 > ※ 오탐후보(FP)에는 ground truth에 라벨 안 된 실제 PII(은행명 등)나 NER 변동분이 섞일 수 있으니, 아래 §4 부록의 항목별 오탐 목록을 검토해 진짜 over-masking과 구분하세요.
 
@@ -17,7 +17,7 @@
 
 | 카테고리 | TP | FN | recall |
 | :-- | --: | --: | --: |
-| ADDRESS | 2 | 1 | 0.67 ⚠️ |
+| ADDRESS | 3 | 0 | 1.00 |
 | API_KEY | 2 | 1 | 0.67 ⚠️ |
 | AWS_SECRET | 3 | 0 | 1.00 |
 | BIZ_NO | 5 | 0 | 1.00 |
@@ -31,7 +31,7 @@
 | KR_ACCOUNT | 1 | 3 | 0.25 ⚠️ |
 | PASSPORT | 2 | 0 | 1.00 |
 | PASSWORD | 0 | 2 | 0.00 ⚠️ |
-| PERSON | 10 | 0 | 1.00 |
+| PERSON | 8 | 2 | 0.80 ⚠️ |
 | PHONE | 7 | 0 | 1.00 |
 | PRIVATE_KEY | 1 | 0 | 1.00 |
 | RRN | 4 | 0 | 1.00 |
@@ -41,15 +41,15 @@
 
 | # | 제목 | 길이 | 심은 | 검출 | 미검출 | 오탐 | block |
 | --: | :-- | --: | --: | --: | --: | --: | :--: |
-| 1 | VOC 01 · 결제 수단 등록 실패 및 계정 잠김 문의 | 434 | 6 | 6 | 0 | 2 | 🔴 |
+| 1 | VOC 01 · 결제 수단 등록 실패 및 계정 잠김 문의 | 434 | 6 | 6 | 0 | 1 | 🔴 |
 | 2 | LOG 01 · 인증 서버 API Key 노출 및 세션 만료 로그 | 1007 | 7 | 7 | 0 | 1 | 🔴 |
-| 3 | VOC 02 · 오프라인 매장 영수증 인증 및 포인트 적립 누락 | 367 | 6 | 6 | 0 | 2 | 🔴 |
-| 4 | LOG 02 · 결제 게이트웨이 웹훅 수신 및 계정 검증 로그 | 871 | 9 | 9 | 0 | 0 | 🔴 |
-| 5 | VOC 03 · 법인 회원 정보 변경 및 정산 증빙 서류 제출 안내 요청 | 409 | 6 | 4 | 2 | 4 | 🔴 |
-| 6 | LOG 03 · 데이터베이스 마이그레이션 중 자격 증명 유출 예외 로그 | 667 | 9 | 7 | 2 | 1 | 🔴 |
-| 7 | VOC 04 · 글로벌 배송 주소 수정 및 여권번호 예외 처리 요청 | 401 | 6 | 6 | 0 | 1 | 🔴 |
-| 8 | LOG 04 · 클라우드 스토리지 동기화 에러 및 자격증명 노출 | 836 | 7 | 5 | 2 | 0 | 🔴 |
-| 9 | VOC 05 · 가상자산 대행 거래 환불 및 신원 검증 요청 | 445 | 7 | 5 | 2 | 3 | 🔴 |
+| 3 | VOC 02 · 오프라인 매장 영수증 인증 및 포인트 적립 누락 | 367 | 6 | 6 | 0 | 0 | 🔴 |
+| 4 | LOG 02 · 결제 게이트웨이 웹훅 수신 및 계정 검증 로그 | 871 | 9 | 8 | 1 | 0 | 🔴 |
+| 5 | VOC 03 · 법인 회원 정보 변경 및 정산 증빙 서류 제출 안내 요청 | 409 | 6 | 4 | 2 | 2 | 🔴 |
+| 6 | LOG 03 · 데이터베이스 마이그레이션 중 자격 증명 유출 예외 로그 | 667 | 9 | 8 | 1 | 1 | 🔴 |
+| 7 | VOC 04 · 글로벌 배송 주소 수정 및 여권번호 예외 처리 요청 | 401 | 6 | 6 | 0 | 0 | 🔴 |
+| 8 | LOG 04 · 클라우드 스토리지 동기화 에러 및 자격증명 노출 | 836 | 7 | 4 | 3 | 0 | 🔴 |
+| 9 | VOC 05 · 가상자산 대행 거래 환불 및 신원 검증 요청 | 445 | 7 | 5 | 2 | 1 | 🔴 |
 | 10 | LOG 05 · 인프라 통합 모니터링 에이전트 자격 증명 수집 로그 | 883 | 9 | 7 | 2 | 0 | 🔴 |
 
 ## 4. 부록 — 전체 항목(텍스트·검출/미검출)
@@ -63,7 +63,7 @@
 - **심은(6)**: `PERSON`=박지민, `PHONE`=010-4321-8765, `EMAIL`=jimin.park@webmail.com, `CARD`=4633-8750-0474-3953, `BIZ_NO`=434-67-77758, `KR_ACCOUNT`=1002-987-654321
 - ✅ **검출(6)**: `PERSON`=박지민, `PHONE`=010-4321-8765, `EMAIL`=jimin.park@webmail.com, `CARD`=4633-8750-0474-3953, `BIZ_NO`=434-67-77758, `KR_ACCOUNT`=1002-987-654321
 - ❌ **미검출(0)**: —
-- ⚠️ **오탐후보(2)**: `PERSON`=ORD-2026-1102, `ORGANIZATION`=우리은행
+- ⚠️ **오탐후보(1)**: `ORGANIZATION`=저희 회사
 
 ### [2] LOG 01 · 인증 서버 API Key 노출 및 세션 만료 로그  (1007자) · 🔴 block
 
@@ -99,7 +99,7 @@ MIIEowIBAAKCAQEA0X8O3vGQ3p...[TRUNCATED].../9kBc=
 - **심은(6)**: `ADDRESS`=서초구 반포대로 234, `PERSON`=이서연, `BIZ_NO`=189-24-78001, `CARD`=4755-1313-7353-7994, `RRN`=910722-3023658, `PHONE`=010-2233-4455
 - ✅ **검출(6)**: `ADDRESS`=서초구 반포대로 234, `PERSON`=이서연, `BIZ_NO`=189-24-78001, `CARD`=4755-1313-7353-7994, `RRN`=910722-3023658, `PHONE`=010-2233-4455
 - ❌ **미검출(0)**: —
-- ⚠️ **오탐후보(2)**: `ORGANIZATION`=국민카드, `PERSON`=TX-9988231
+- ⚠️ **오탐후보(0)**: —
 
 ### [4] LOG 02 · 결제 게이트웨이 웹훅 수신 및 계정 검증 로그  (871자) · 🔴 block
 
@@ -125,8 +125,8 @@ MIIEowIBAAKCAQEA0X8O3vGQ3p...[TRUNCATED].../9kBc=
 ```
 
 - **심은(9)**: `IP_ADDRESS`=10.240.0.34, `HOSTNAME`=payment-worker.internal, `PERSON`=정민우, `EMAIL`=minwoo.jung@gmail.corp, `PHONE`=010-5566-7788, `PASSPORT`=M12345678, `CARD`=4075-1163-7265-1675, `RRN`=710310-4151262, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
-- ✅ **검출(9)**: `IP_ADDRESS`=10.240.0.34, `HOSTNAME`=payment-worker.internal, `PERSON`=정민우, `EMAIL`=minwoo.jung@gmail.corp, `PHONE`=010-5566-7788, `PASSPORT`=M12345678, `CARD`=4075-1163-7265-1675, `RRN`=710310-4151262, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
-- ❌ **미검출(0)**: —
+- ✅ **검출(8)**: `IP_ADDRESS`=10.240.0.34, `HOSTNAME`=payment-worker.internal, `EMAIL`=minwoo.jung@gmail.corp, `PHONE`=010-5566-7788, `PASSPORT`=M12345678, `CARD`=4075-1163-7265-1675, `RRN`=710310-4151262, `TOKEN`=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+- ❌ **미검출(1)**: `PERSON`=정민우
 - ⚠️ **오탐후보(0)**: —
 
 ### [5] VOC 03 · 법인 회원 정보 변경 및 정산 증빙 서류 제출 안내 요청  (409자) · 🔴 block
@@ -138,7 +138,7 @@ MIIEowIBAAKCAQEA0X8O3vGQ3p...[TRUNCATED].../9kBc=
 - **심은(6)**: `PERSON`=한지영, `EMAIL`=jyhan@partner-company.com, `PHONE`=010-8888-9999, `BIZ_NO`=688-17-36719, `KR_ACCOUNT`=333-9102-33445, `FOREIGN_REG`=120923-1591783
 - ✅ **검출(4)**: `PERSON`=한지영, `EMAIL`=jyhan@partner-company.com, `PHONE`=010-8888-9999, `BIZ_NO`=688-17-36719
 - ❌ **미검출(2)**: `KR_ACCOUNT`=333-9102-33445, `FOREIGN_REG`=120923-1591783
-- ⚠️ **오탐후보(4)**: `ORGANIZATION`=하나은행, `PERSON`=333-9102-33445, `RRN`=120923-1591783, `PERSON`=v3.2.0
+- ⚠️ **오탐후보(2)**: `ORGANIZATION`=대행업체인데, `RRN`=120923-1591783
 
 ### [6] LOG 03 · 데이터베이스 마이그레이션 중 자격 증명 유출 예외 로그  (667자) · 🔴 block
 
@@ -162,8 +162,8 @@ CONTACT_NUM="010-7711-2233"
 ```
 
 - **심은(9)**: `HOSTNAME`=prod-db.local, `IP_ADDRESS`=172.16.22.81, `PASSWORD`=P@ssw0rd12345!, `GCP_KEY`=AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q, `PERSON`=강동우, `ADDRESS`=강남구 테헤란로 501, `PHONE`=010-7711-2233, `BIZ_NO`=751-47-92277, `CARD`=4612-2202-9729-9758
-- ✅ **검출(7)**: `HOSTNAME`=prod-db.local, `IP_ADDRESS`=172.16.22.81, `GCP_KEY`=AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q, `PERSON`=강동우, `PHONE`=010-7711-2233, `BIZ_NO`=751-47-92277, `CARD`=4612-2202-9729-9758
-- ❌ **미검출(2)**: `PASSWORD`=P@ssw0rd12345!, `ADDRESS`=강남구 테헤란로 501
+- ✅ **검출(8)**: `HOSTNAME`=prod-db.local, `IP_ADDRESS`=172.16.22.81, `GCP_KEY`=AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q, `PERSON`=강동우, `ADDRESS`=강남구 테헤란로 501, `PHONE`=010-7711-2233, `BIZ_NO`=751-47-92277, `CARD`=4612-2202-9729-9758
+- ❌ **미검출(1)**: `PASSWORD`=P@ssw0rd12345!
 - ⚠️ **오탐후보(1)**: `ADDRESS`=5432 closed unexpect
 
 ### [7] VOC 04 · 글로벌 배송 주소 수정 및 여권번호 예외 처리 요청  (401자) · 🔴 block
@@ -175,7 +175,7 @@ CONTACT_NUM="010-7711-2233"
 - **심은(6)**: `PERSON`=김현우, `PHONE`=010-1111-2222, `ADDRESS`=영등포구 여의서로 43, `PASSPORT`=S98765432, `RRN`=940413-4961351, `EMAIL`=hwkim@global-post.com
 - ✅ **검출(6)**: `PERSON`=김현우, `PHONE`=010-1111-2222, `ADDRESS`=영등포구 여의서로 43, `PASSPORT`=S98765432, `RRN`=940413-4961351, `EMAIL`=hwkim@global-post.com
 - ❌ **미검출(0)**: —
-- ⚠️ **오탐후보(1)**: `PERSON`=TRACK-002931-KR
+- ⚠️ **오탐후보(0)**: —
 
 ### [8] LOG 04 · 클라우드 스토리지 동기화 에러 및 자격증명 노출  (836자) · 🔴 block
 
@@ -196,8 +196,8 @@ Failed parameters dump:
 ```
 
 - **심은(7)**: `HOSTNAME`=backup-target.corp, `IP_ADDRESS`=10.0.12.145, `PERSON`=윤서준, `BIZ_NO`=898-08-21922, `AWS_SECRET`=AKIA9988776655443322, `API_KEY`=ghp_1234567890abcdefghijklmnopqrstVXYZ, `KR_ACCOUNT`=302-1234-5678-90
-- ✅ **검출(5)**: `HOSTNAME`=backup-target.corp, `IP_ADDRESS`=10.0.12.145, `PERSON`=윤서준, `BIZ_NO`=898-08-21922, `AWS_SECRET`=AKIA9988776655443322
-- ❌ **미검출(2)**: `API_KEY`=ghp_1234567890abcdefghijklmnopqrstVXYZ, `KR_ACCOUNT`=302-1234-5678-90
+- ✅ **검출(4)**: `HOSTNAME`=backup-target.corp, `IP_ADDRESS`=10.0.12.145, `BIZ_NO`=898-08-21922, `AWS_SECRET`=AKIA9988776655443322
+- ❌ **미검출(3)**: `PERSON`=윤서준, `API_KEY`=ghp_1234567890abcdefghijklmnopqrstVXYZ, `KR_ACCOUNT`=302-1234-5678-90
 - ⚠️ **오탐후보(0)**: —
 
 ### [9] VOC 05 · 가상자산 대행 거래 환불 및 신원 검증 요청  (445자) · 🔴 block
@@ -209,7 +209,7 @@ Failed parameters dump:
 - **심은(7)**: `PERSON`=최예은, `PHONE`=010-3344-5566, `FOREIGN_REG`=700523-4376198, `KR_ACCOUNT`=010-992341-12-011, `HOSTNAME`=api.internal, `API_KEY`=ghp_ABCdefGHIjklMNOpqrSTUvwxyz1234567890, `EMAIL`=yeeun.choi@cryptomail.net
 - ✅ **검출(5)**: `PERSON`=최예은, `PHONE`=010-3344-5566, `HOSTNAME`=api.internal, `API_KEY`=ghp_ABCdefGHIjklMNOpqrSTUvwxyz1234567890, `EMAIL`=yeeun.choi@cryptomail.net
 - ❌ **미검출(2)**: `FOREIGN_REG`=700523-4376198, `KR_ACCOUNT`=010-992341-12-011
-- ⚠️ **오탐후보(3)**: `RRN`=700523-4376198, `ORGANIZATION`=기업은행, `PERSON`=010-992341-12-011
+- ⚠️ **오탐후보(1)**: `RRN`=700523-4376198
 
 ### [10] LOG 05 · 인프라 통합 모니터링 에이전트 자격 증명 수집 로그  (883자) · 🔴 block
 
