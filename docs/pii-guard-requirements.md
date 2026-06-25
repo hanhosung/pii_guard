@@ -674,7 +674,7 @@ acceptance_criteria:
 ### 23.6 실효성 검증 결과 + proximity 보완 계획 (R17)
 
 **검증(완료)**: 합성 30케이스(한국어 ~1000자 + 영문 시크릿, 실전형)로 실제 엔진을 돌려 재현율·정밀도 측정.
-산출물 = [`validation/EFFICACY_REPORT.md`](../../validation/EFFICACY_REPORT.md)(리포트) + `efficacy_test_log.txt`(증거 로그) + `efficacy_test.py`(재현 하니스).
+산출물 = [`validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md`](../../validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md)(리포트) + `efficacy_test_log.txt`(증거 로그) + `efficacy_test.py`(재현 하니스).
 
 | 지표 | 초기(보정) | **R17 적용 후(보정)** | 비고 |
 | :-- | :-- | :-- | :-- |

@@ -184,7 +184,7 @@
 ```bash
 cd /Users/ho/workspace/Monoly_genAI/pii_guard
 PYTHONPATH=. .venv/bin/python validation/efficacy_test.py
-# → efficacy_test_log.txt(전체 텍스트·원시 탐지 증거) + EFFICACY_REPORT.md + _summary.json
+# → efficacy_test_log.txt(전체 텍스트·원시 탐지 증거) + EXTERNAL_LLM_TEST_2026-06-23_claude.md + _summary.json
 ```
 
 ## 부록 A. 케이스 전문 · 검출/미검출 상세

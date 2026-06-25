@@ -5,7 +5,7 @@ Negative-proximity / NER false-positive suppression (PROXIMITY_DESIGN.md Phase 1
 
 Stage-2 NER (spaCy ko) over-extracts on code/technical text and on a handful of
 common Korean nouns, mislabelling them PERSON / ORGANIZATION / ADDRESS. The
-efficacy validation (validation/EFFICACY_REPORT.md) traced 36 true over-masking
+efficacy validation (validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md) traced 36 true over-masking
 FPs, concentrated in:
 
   - **code / technical tokens** — ``API_KEY``, ``DB_PASSWORD``, ``send_email(...)``,

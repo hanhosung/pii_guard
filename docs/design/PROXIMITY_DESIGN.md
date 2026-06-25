@@ -5,14 +5,14 @@
 > 재현율 0.92→**0.95**, 정밀도 0.85→**0.94**, 전체 **2685 테스트 무회귀**.
 >
 > 상태: **구현 완료(Implemented)** · 작성: 2026-06-23 · 대상: `pii_guard` 탐지 파이프라인
-> 짝 문서: [`../DESIGN.md`](../DESIGN.md)(as-built §6.5/6.6), [`../../validation/EFFICACY_REPORT.md`](../../validation/EFFICACY_REPORT.md)(검증 근거)
+> 짝 문서: [`../DESIGN.md`](../DESIGN.md)(as-built §6.5/6.6), [`../../validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md`](../../validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md)(검증 근거)
 > 본 문서는 원래 제안서이며 Phase 1·2·3로 구현 완료됨(상단 배너). **단, 음성 메커니즘은 §3.2/§5.2의 *스팬 사전 게이팅* 대신 `stage2/ner_filters.py`의 *NER 후필터*로 실현**됐다(더 정밀·오프셋 재매핑 불필요). 본문 §3~§10은 제안 당시 기록으로 보존한다.
 
 ---
 
 ## 1. 배경 · 동기 (검증 근거)
 
-30케이스 실효성 검증(`validation/EFFICACY_REPORT.md`)에서 드러난 갭:
+30케이스 실효성 검증(`validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md`)에서 드러난 갭:
 
 | 유형 | 갭 | 검증 수치 |
 | :-- | :-- | :-- |

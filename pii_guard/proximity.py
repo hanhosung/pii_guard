@@ -13,7 +13,7 @@ Positive proximity (context-gated) detection — PROXIMITY_DESIGN.md Phase 2.
 Some real PII has an **ambiguous shape** that the Stage-1 regex rules deliberately
 do NOT match, to avoid a false-positive explosion (e.g. a bare ``123-456-789012``
 could be an order number, a courier id, …). The efficacy validation
-(validation/EFFICACY_REPORT.md) showed these slip through:
+(validation/EXTERNAL_LLM_TEST_2026-06-23_claude.md) showed these slip through:
 
   - **KR_ACCOUNT** — non-standard ``3-3-6`` and Kakao/Toss ``4-2-7`` formats.
   - **BIZ_NO** — hyphen-less 10-digit business registration numbers.
