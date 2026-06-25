@@ -36,9 +36,12 @@ ner = [
 # Korean-specific model is downloaded on first use; default taeminlee/gliner_ko,
 # overridable via PIIGUARD_GLINER_MODEL. Select the backend with
 # PIIGUARD_NER_BACKEND=gliner|spacy or policy stage2.ner_backend (R18 / ADR-11).
+# python-mecab-ko is the word splitter required by taeminlee/gliner_ko (bundled
+# mecab-ko dict — no system/Java install needed).
 ner-gliner = [
     "gliner>=0.2",
     "torch>=2.0",
+    "python-mecab-ko>=1.3",
 ]
 # Interactive Streamlit UI (ui/app.py): chat + multi-file PII scan with console output.
 # Run with: streamlit run ui/app.py

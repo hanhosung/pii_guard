@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "corpus_seed": 42,
+    "samples_per_format": 5,
+    "ner_available": true,
+    "ner_backend": "gliner",
+    "pipeline": "stage1+stage2_ner",
+    "min_confidence": 0.5,
+    "ner_load_error": null,
+    "corpus_sizes": {
+      "positive": 220,
+      "negative": 54,
+      "ner_clean_negatives": 18,
+      "org_samples": 25
+    }
+  },
+  "stage1_metrics": {
+    "PERSON": {
+      "precision": 1.0,
+      "recall": 0.5556,
+      "tp": 25,
+      "fp": 0,
+      "fn": 20
+    },
+    "ADDRESS": {
+      "precision": 1.0,
+      "recall": 0.84,
+      "tp": 21,
+      "fp": 0,
+      "fn": 4
+    },
+    "ORGANIZATION": {
+      "precision": 1.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 25
+    }
+  },
+  "full_pipeline_metrics": {
+    "PERSON": {
+      "precision": 0.8,
+      "recall": 0.9778,
+      "tp": 44,
+      "fp": 11,
+      "fn": 1
+    },
+    "ADDRESS": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 25,
+      "fp": 0,
+      "fn": 0
+    },
+    "ORGANIZATION": {
+      "precision": 0.8621,
+      "recall": 1.0,
+      "tp": 25,
+      "fp": 4,
+      "fn": 0
+    }
+  },
+  "ner_contribution": {
+    "PERSON": {
+      "recall_gain": 0.4222,
+      "precision_delta": -0.2
+    },
+    "ADDRESS": {
+      "recall_gain": 0.16,
+      "precision_delta": 0.0
+    },
+    "ORGANIZATION": {
+      "recall_gain": 1.0,
+      "precision_delta": -0.1379
+    }
+  },
+  "thresholds_met": true,
+  "threshold_failures": []
+}

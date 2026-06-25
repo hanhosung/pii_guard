@@ -342,6 +342,12 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Run Stage-1 only (skip NER; useful if presidio/spaCy not installed)",
     )
     parser.add_argument(
+        "--ner-backend",
+        choices=("spacy", "gliner"),
+        default="spacy",
+        help="Stage-2 NER backend to benchmark (default: spacy)",
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         default=False,
@@ -366,6 +372,7 @@ def run_benchmark(
     no_ner: bool = False,
     apply_thresholds: bool = False,
     quiet: bool = False,
+    ner_backend: str = "spacy",
 ) -> Dict:
     """
     Run the Korean NER benchmark and return the metrics report dict.
@@ -430,9 +437,15 @@ def run_benchmark(
 
     if not no_ner:
         try:
-            from pii_guard.stage2.korean_ner import KoreanNEREngine
-            _log("Loading KoreanNEREngine (Presidio + ko_core_news_sm) ...", quiet)
-            ner_engine = KoreanNEREngine(min_confidence=min_confidence)
+            # R18: select the NER backend engine (spacy default / gliner).
+            if ner_backend == "gliner":
+                from pii_guard.stage2.gliner_ner import GLiNERNEREngine
+                _log("Loading GLiNERNEREngine (GLiNER Korean model) ...", quiet)
+                ner_engine = GLiNERNEREngine(min_confidence=min_confidence)
+            else:
+                from pii_guard.stage2.korean_ner import KoreanNEREngine
+                _log("Loading KoreanNEREngine (Presidio + spaCy ko) ...", quiet)
+                ner_engine = KoreanNEREngine(min_confidence=min_confidence)
             # Warm up — triggers lazy model loading
             ner_engine.detect("테스트")
             ner_available = True
@@ -442,13 +455,13 @@ def run_benchmark(
             _log(
                 f"  WARNING: NER engine not available — running Stage-1 only.\n"
                 f"  Reason: {ner_load_error}\n"
-                f"  To enable NER: pip install presidio-analyzer presidio-anonymizer spacy && "
-                f"python -m spacy download ko_core_news_sm",
+                f"  To enable NER: install the backend ([ner] for spacy, "
+                f"[ner-gliner] for gliner) and let the model download.",
                 quiet,
             )
         except ImportError as exc:
             ner_load_error = str(exc)
-            _log(f"  WARNING: presidio/spacy not installed: {ner_load_error}", quiet)
+            _log(f"  WARNING: NER backend deps not installed: {ner_load_error}", quiet)
 
     # ── Build detector functions ──────────────────────────────────────────────
     stage1_detector = _build_detector_fn(stage1_engine, ner_engine=None)
@@ -517,6 +530,7 @@ def run_benchmark(
             "corpus_seed": corpus_seed,
             "samples_per_format": samples_per_format,
             "ner_available": ner_available,
+            "ner_backend": ner_backend,
             "pipeline": "stage1+stage2_ner" if ner_available else "stage1_only",
             "min_confidence": min_confidence,
             "ner_load_error": ner_load_error,
@@ -547,6 +561,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         no_ner=args.no_ner,
         apply_thresholds=args.thresholds,
         quiet=args.quiet,
+        ner_backend=args.ner_backend,
     )
 
     json_output = json.dumps(report, indent=2, ensure_ascii=False)

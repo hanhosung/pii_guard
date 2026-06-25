@@ -304,7 +304,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 - **격리·degrade**: `Stage2NERRunner.scan(text, stage1_dets)` — 워커 타임아웃/OOM/예외 시
   Stage1 결과 반환 + `coverage_gap=True` + `fail_reason`. (백엔드 무관 동일)
 
-> **구현 상태(정직, P3)**: dual-backend 설계·배선 **구현 완료** — `stage2/backend.py`(`resolve_ner_backend`/`load_engine_class`)·`stage2/gliner_ner.py`(`GLiNERNEREngine`)·`_workers.py` 백엔드 분기·`policy.py`(`stage2.ner_backend`)·`Engine(ner_backend=)` env 전파·`serve` 연결. 선택 로직은 단위테스트(`tests/test_ner_backend.py`, 20케이스)로 검증. **단, GLiNER 런타임/품질은 실측 미완**(개발 환경에 gliner/torch 미설치 → `[ner-gliner]` 설치 후 동작·측정). 아래 §6.4 GLiNER 행은 측정 예정(목표) 값이다.
+> **구현 상태(정직, P3)**: dual-backend 설계·배선 **구현 완료** — `stage2/backend.py`(`resolve_ner_backend`/`load_engine_class`)·`stage2/gliner_ner.py`(`GLiNERNEREngine`)·`_workers.py` 백엔드 분기·`policy.py`(`stage2.ner_backend`)·`Engine(ner_backend=)` env 전파·`serve` 연결. 선택 로직은 단위테스트(`tests/test_ner_backend.py`, 20케이스)로 검증. GLiNER **런타임·품질도 실측 완료**(`taeminlee/gliner_ko`, 스모크 `validation/gliner_smoke.py` PASS + 코퍼스 벤치마크 `validation/gliner_benchmark.json`, 전 임계값 통과) — 아래 §6.4 GLiNER 행은 실측치다.
 
 ### 6.3 올바른 fast-path (요구사항 §6.3)
 - ❌ "Stage1 clean이면 NER 스킵"은 틀림(NER은 정규식이 놓친 걸 담당).
@@ -335,15 +335,17 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 
 (`benchmarks/korean_ner_benchmark.py`, `thresholds_met=true`)
 
-**GLiNER 백엔드 (한국어 특화) — 측정 예정(목표):**
+**GLiNER 백엔드 (taeminlee/gliner_ko, full-pipeline) — 실측 (동일 코퍼스, seed=42):**
 
-| 엔티티 | precision(목표) | recall(목표) | 상태 |
+| 엔티티 | precision | recall | spaCy 대비 |
 | :-- | :-- | :-- | :-- |
-| PERSON | ≥ 0.95 | **≥ 0.90** | ⏳ 백엔드 배선 후 동일 코퍼스로 실측 예정 |
-| ADDRESS | ≥ 0.95 | ≥ 0.95 | ⏳ 동상 |
-| ORGANIZATION | ≥ 0.95 | ≥ 0.90 | ⏳ 동상 |
+| PERSON | 0.80 | **0.978** | recall +0.14 (✅ 목표 ≥0.90 달성), precision −0.17 |
+| ADDRESS | 1.00 | 1.00 | 동일 |
+| ORGANIZATION | 0.862 | 1.00 | recall +0.08, precision −0.14 |
 
-> 목표는 GLiNER 채택의 핵심 동인인 PERSON 재현율 향상(spaCy 0.84 → ≥0.90)을 명시한다. 실측 전까지 보증선은 spaCy 표이며, GLiNER 실측이 목표 미달이면 기본 백엔드 결정을 재검토한다(ADR-11 재평가 트리거).
+(`benchmarks/korean_ner_benchmark.py --ner-backend gliner`, 전 임계값 통과 / 리포트 `validation/gliner_benchmark.json`)
+
+> **실측 결론**: GLiNER 채택의 핵심 동인인 PERSON 재현율이 0.84 → **0.978**로 크게 향상돼 목표(≥0.90)를 달성했다(ORGANIZATION도 0.92 → 1.00). 대가로 정밀도는 PERSON 0.97 → 0.80, ORG 1.00 → 0.86으로 하락 — 즉 **재현율↑·정밀도↓**라는 dual-backend 설계 가설이 그대로 확인됐다(과잉 마스킹은 R17 음성 proximity 후필터로 추가 완화 가능). 보안(유출 방지=재현율) 우선이라 기본 GLiNER가 타당하며, 정밀도가 중요한 환경은 `spacy` 백엔드를 선택하면 된다.
 
 ---
 
@@ -647,13 +649,12 @@ RedactionResult
 후처리로 재사용.
 
 **결과·트레이드오프(Consequences).**
-- GLiNER 기본은 PyTorch 의존을 더한다 → `[ner-gliner]` 옵션 설치 + 별도 venv/워커로 격리(코어는 표준
-  라이브러리만, 무영향).
-- **검증 책무**: GLiNER 실측치 확보 전까지 보증선은 spaCy 실측표(§6.4). GLiNER 실측이 목표(PERSON recall
-  ≥0.90) 미달이면 **기본 백엔드 결정을 재평가**(ADR-11 재평가 트리거).
-- **구현 상태(정직, P3)**: dual-backend **배선 구현 완료**(backend.py·gliner_ner.py·_workers.py·policy.py·
-  Engine·serve), 선택 로직 단위테스트 검증. GLiNER 런타임/품질 **실측은 `[ner-gliner]` 설치 후**(개발
-  환경 미설치).
+- GLiNER 기본은 PyTorch 의존(+`taeminlee/gliner_ko`용 `python-mecab-ko`)을 더한다 → `[ner-gliner]` 옵션
+  설치 + 별도 venv/워커로 격리(코어는 표준 라이브러리만, 무영향).
+- **검증 결과(실측)**: GLiNER가 PERSON recall 0.84 → **0.978**(목표 ≥0.90 달성), ORG 0.92 → 1.00로 재현율
+  향상. 정밀도는 PERSON 0.97 → 0.80, ORG 1.00 → 0.86로 하락(§6.4) — 재현율↑·정밀도↓ 가설 확인. 보안
+  우선이라 기본 GLiNER 유지, 정밀도 우선 환경은 `spacy` 선택. (ADR-11 재평가 트리거 미발동.)
+- **구현 상태(정직, P3)**: dual-backend 배선·단위테스트·GLiNER 런타임/벤치마크 **모두 완료**.
 
 ---
 
