@@ -301,6 +301,13 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
   - 모델 해석(`resolve_ko_spacy_model`): `PIIGUARD_KO_SPACY_MODEL` env > `ko_core_news_lg` > `ko_core_news_sm`.
   - spaCy 라벨 → 엔티티 매핑: `PS→PERSON, LC→LOCATION(=ADDRESS), OG→ORGANIZATION`.
 - **공통**: 한국어 조사 스트리핑("홍길동은"→"홍길동"), `min_confidence`(기본 0.50) 미만 폐기.
+- **추출 임계값 노브(R20·ADR-12)**: 위 `min_confidence`(= NER 스팬 점수 컷, 레이어 (b))를
+  `stage2.ner_min_confidence`/`PIIGUARD_NER_MIN_CONFIDENCE`로 노출(전역, env>정책>0.50). ⚠️ 카테고리 규칙
+  신뢰도(`CategoryPolicy.min_confidence`, 레이어 (a))와 **다른 것**. recall-우선이라 0.5→0.35 권장(실측: ADDRESS
+  0.88→1.00·PERSON 0.956→0.978, FP 거의 불변). 상세 §20.4. (설계 — 구현 대상)
+- **모델 교체 슬롯 = 파인튜닝 산출물도 동일 경로(R20·ADR-13)**: `PIIGUARD_GLINER_MODEL`에 파인튜닝 모델
+  (local-path/repo)을 지정하면 런타임 변경 없이 교체. 학습은 오프박스 `training/` 서브시스템(대량 보유 데이터
+  1급 입력 + eval 게이트 + 민감정보 거버넌스). 상세 §20.5.
 - **격리·degrade**: `Stage2NERRunner.scan(text, stage1_dets)` — 워커 타임아웃/OOM/예외 시
   Stage1 결과 반환 + `coverage_gap=True` + `fail_reason`. (백엔드 무관 동일)
 - **워밍업(콜드로드 분리)**: GLiNER 콜드 모델 로드(~14.4s)는 블록당 기본 타임아웃(10s)을 초과해, 워밍업이
@@ -569,6 +576,8 @@ RedactionResult
 | **ADR-9** | **spaCy 백엔드의 PII 프레임워크 = Microsoft Presidio** | 완전 로컬 + PII 전용(정규식+NER+문맥+신뢰도 통합) + NLP엔진 교체 추상화 + 감사 설명가능성. (GLiNER 백엔드는 프레임워크 없이 직접 매핑.) 상세 §20.1. |
 | **ADR-10** | **Stage2 NLP 엔진 = 선택형 백엔드(GLiNER 기본 / spaCy 폴백)** | GLiNER=한국어 재현율↑(트랜스포머), spaCy=경량·8GB 빠듯 환경 폴백. 둘 다 비생성형(인젝션 불가). 상세 §20.2. (백엔드 선택 메커니즘은 ADR-11, spaCy 변형 sm/lg는 ADR-5) |
 | **ADR-11** | **NER 백엔드 선택 메커니즘 = env + 정책 YAML, 기본 gliner** | `PIIGUARD_NER_BACKEND` > `stage2.ner_backend` > 기본 `gliner`. 동일 인터페이스·동일 카테고리로 후단 백엔드 무관. 상세 §20.3. |
+| **ADR-12** | **NER 추출 임계값 노출 = 전역 정책/env 노브**(R20) | GLiNER/spaCy의 스팬 점수 컷(`min_confidence`)을 `stage2.ner_min_confidence`/`PIIGUARD_NER_MIN_CONFIDENCE`로 노출(ADR-11 패턴 재사용). **카테고리 규칙 신뢰도(다른 레이어)와 구분.** recall-우선이라 낮춤 유리(0.5→0.35). 상세 §20.4. |
+| **ADR-13** | **GLiNER 파인튜닝 라이프사이클 = 런타임 무변경 + 오프박스 학습**(R20) | 파인튜닝 모델은 기존 모델 슬롯(`PIIGUARD_GLINER_MODEL`)으로 소비(코어 무변경). 학습은 별도 `training/` 서브시스템(대량 보유 데이터 1급 입력 + eval 게이트 + 민감정보 거버넌스). Apache 베이스→산출물 상업 가능. 상세 §20.5. |
 
 ---
 
@@ -702,6 +711,79 @@ RedactionResult
   coverage_gap 가시화**를 유지한다(`on_ner_backend_unavailable` 노브는 추가하지 않음). 근거: 워밍업으로
   상시-degrade 원인이 제거됐고, 남는 실패는 진짜 인프라 장애이므로 침묵 폴백보다 **가시화(P3·P5)**가 낫다.
 - 두 백엔드 출력 카테고리가 동일하므로 전환 시 정책/마스킹 변경 불필요(인터페이스 안정).
+
+---
+
+## 20.4 ADR-12 (상세) — NER 추출 임계값(min_confidence) 전역 노브 노출
+
+**맥락(Context).** GLiNER/spaCy는 각 스팬에 **점수(0~1)**를 매기고, 그 점수가 임계값 미만이면 버린다(엔진 내부
+`MIN_CONFIDENCE=0.50`). 실측상 이 값을 0.5→0.35로 낮추면 ADDRESS recall 0.88→1.00·PERSON 0.956→0.978로
+오르고 **오탐은 거의 안 는다**(거의 공짜 Pareto 개선). 그런데 이 값이 코드에 하드코딩돼 있어 운영자가 못 바꾼다.
+
+**⚠️ 두 개의 "min_confidence"를 구분(설계 핵심).**
+| 레이어 | 무엇 | 위치 | 본 ADR 대상 |
+| :-- | :-- | :-- | :-- |
+| (a) 카테고리/결정 신뢰도 | **규칙(rule) 신뢰도** 필터 | `CategoryPolicy.min_confidence`·`decision.py`·`stage2/policy_layer.py` | ✕ |
+| (b) **NER 추출 임계값** | 모델의 **스팬 점수** 컷 | `GLiNERNEREngine`/`KoreanNEREngine`(엔진 내부) | ✓ |
+
+이름이 같아 혼동 위험 → **(b)는 별도 키로 명명**한다.
+
+**결정(Decision).** (b)를 **전역 노브**로 노출 — ADR-11 메커니즘 재사용.
+```
+정책 stage2.ner_min_confidence (기본 0.50, float [0,1])
+  └▶ Engine이 PIIGUARD_NER_MIN_CONFIDENCE env 설정(PIIGUARD_NER_BACKEND과 동일)
+       └▶ 워커가 읽어 GLiNERNEREngine/KoreanNEREngine(min_confidence=) 주입
+우선순위:  env > 정책 > 기본 0.50
+```
+
+**근거(Rationale).**
+1. **전역 우선** — 실측 이득이 전역이었고, ORG는 임계값에 무반응(P 0.774 고정)이라 per-category 임계값이 ORG엔
+   무의미(ORG는 ADR-13 파인튜닝 영역). per-category 임계값은 필요 시 후속(스팬 사후필터)으로.
+2. **기본값 0.50 유지** — 보안 기본값을 조용히 바꾸지 않음(P2). 정책 템플릿에 **recall-우선 권장 0.35** 주석.
+3. **재사용** — ADR-11 env-전파 패턴 그대로 → 검증·핫리로드 규약 일관.
+
+**결과·트레이드오프.** 너무 낮추면 과잉 마스킹↑(precision↓). 노브일 뿐 자동 최적화는 아님 → 배포자가
+`benchmarks/korean_ner_benchmark.py`로 자기 데이터에 맞춰 조정. 구현 상태: **설계(R20) — 구현 대상.**
+
+---
+
+## 20.5 ADR-13 (상세) — GLiNER 파인튜닝 라이프사이클 (대량 데이터 본격 학습 지원)
+
+**맥락(Context).** 임계값(ADR-12)은 곡선 위 이동(트레이드오프)일 뿐, **곡선 자체를 올리려면**(recall·precision
+동시 향상, 특히 ORG 정밀도 0.774) 모델 파인튜닝이 필요하다. **수천~수만 건의 라벨 데이터를 보유하고 본격
+학습이 가능한 상황**을 1급으로 지원해야 한다.
+
+**결정(Decision).** **런타임은 변경하지 않고**, 파인튜닝을 **오프박스 학습 서브시스템**으로 둔다.
+
+1. **런타임 소비 — 무변경.** 파인튜닝 산출 모델은 기존 슬롯으로 로드: `PIIGUARD_GLINER_MODEL=<local-path|repo>`
+   (`resolve_gliner_model`). 코어/워커 코드·배선 변경 없음.
+2. **학습 서브시스템(`training/`, 런타임 패키지 밖에 격리).**
+   ```
+   training/
+     data/schema.md   표준 라벨 스키마(아래) 정의
+     ingest.py        보유 라벨 데이터(수천+)를 표준 포맷으로 변환·검증  ← 1급 입력
+     augment.py       (선택) gazetteer·다중 LLM 합성으로 부족 카테고리·hard-negative 보강
+     split.py         train/val/test 분할 (평가 누설 방지)
+     train.py         gliner.training.Trainer, 베이스 urchade(Apache), 에폭·배치·LR·early-stop·checkpoint
+     eval.py          test셋 + benchmarks/korean_ner_benchmark.py + 외부 6리포트로 사전/사후 비교
+   ```
+   - **표준 학습 스키마(GLiNER)**: `{"tokenized_text":[...], "ner":[[start_tok,end_tok,"PERSON|ADDRESS|ORGANIZATION"]...]}`.
+     문자-span 라벨이면 `ingest.py`가 토큰-index로 변환. **보유 데이터가 1급 입력, 합성은 보조.**
+3. **규모·목표(데이터 양에 따라).**
+   - 좁은 목표(ORG 정밀도 hard-negative): 수백~2,000.
+   - **광역 도메인 적응(보유 수천~수만)**: PERSON/ADDRESS/ORG **recall·precision 동시 대폭 향상**(합성 한계 해소).
+
+**근거(Rationale).**
+- 모델 슬롯이 이미 추상화돼 있어 **런타임 무변경**으로 어떤 파인튜닝 산출물도 교체 가능(ADR-10/11 정합).
+- 학습 코드·무거운 의존을 런타임과 분리 → 코어는 표준 라이브러리 원칙 유지(ADR-2 정합).
+
+**결과·트레이드오프 / 거버넌스(필수).**
+- **평가 누설 방지**: 학습셋과 평가셋(코퍼스 seed=42·외부 6리포트)을 **반드시 분리**. 안 그러면 점수 부풀려짐.
+- **채택 게이트**: 파인튜닝 모델은 `thresholds_met` 통과 + 외부 6리포트 **회귀 0**일 때만 기본 모델로 승격.
+- **민감정보 거버넌스(실 PII 학습 시)**: 학습 데이터는 **학습 전용 오프박스 호스트에서만**, **레포 미커밋**
+  (`.gitignore`), 암호화 보관(P4 정합). 모델 가중치는 **희소 문자열 암기 위험** → 배포 전 암기/유출 점검(학습
+  샘플을 모델이 그대로 재현하는지). 라이선스: 베이스 Apache → 가중치 Apache(상업 OK), 학습 데이터는 보유자 소유.
+- 구현 상태: **설계(R20) — 학습 서브시스템 구현 대상.**
 
 ---
 
