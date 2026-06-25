@@ -15,12 +15,16 @@ Protocol
 Worker types
 ------------
 ``default_ner_worker_loop``
-    Production worker — loads Presidio with a spaCy Korean model
-    (``ko_core_news_sm``) lazily on first request and runs NER on subsequent
-    calls.  Detects Korean PERSON, ADDRESS (location), and ORGANIZATION
-    entities with non-zero confidence scores.  Gracefully falls back on
-    MemoryError or any unexpected exception by sending an ``("error", ...)``
-    response so the runner can degrade to Stage-1.
+    Production worker — selects the Stage-2 NER backend via
+    :func:`~pii_guard.stage2.backend.resolve_ner_backend` (env
+    ``PIIGUARD_NER_BACKEND`` → default ``gliner``), then lazily loads that
+    backend's engine on the first request (GLiNER for ``gliner``, Presidio +
+    spaCy Korean model for ``spacy``) and runs NER on subsequent calls.  Both
+    engines share the same ``.detect(text) -> List[Detection]`` interface and
+    emit the same PERSON / ADDRESS / ORGANIZATION categories, so this loop is
+    backend-agnostic.  Gracefully falls back on MemoryError or any unexpected
+    exception by sending an ``("error", ...)`` response so the runner can
+    degrade to Stage-1.
 
 ``_test_noop_worker``
     Test helper — responds immediately with an empty list.
@@ -56,13 +60,12 @@ def default_ner_worker_loop(req_q, resp_q) -> None:  # pragma: no cover
     """
     Production Stage2 NER worker loop.
 
-    Uses :class:`~pii_guard.stage2.korean_ner.KoreanNEREngine` (Presidio
-    orchestrating ``ko_core_news_sm``) to detect Korean PERSON, ADDRESS
-    (location), and ORGANIZATION entities in unstructured text.
-
-    The engine is initialised lazily on the first request so model loading
-    cost is paid once per subprocess lifetime.  Subsequent requests reuse the
-    already-loaded model.
+    Selects the NER backend (``gliner`` default / ``spacy`` fallback) via
+    :func:`~pii_guard.stage2.backend.resolve_ner_backend` and lazily loads that
+    backend's engine on the first request, so the heavy model is loaded once
+    per subprocess lifetime and only inside this subprocess.  Both backends
+    detect Korean PERSON, ADDRESS (location), and ORGANIZATION entities and
+    return identical ``Detection`` objects.
 
     Failure handling:
     - ``MemoryError``: caught and reported as an error response so the runner
@@ -70,17 +73,24 @@ def default_ner_worker_loop(req_q, resp_q) -> None:  # pragma: no cover
     - Any other exception: caught and reported; the subprocess stays alive.
     - Idle for 60 s: exits cleanly so the process does not linger.
     """
-    # KoreanNEREngine is imported inside the subprocess so the spaCy model
-    # is never loaded in the parent (forwarding core) process.
+    # The engine class is resolved + imported inside the subprocess so the heavy
+    # model (GLiNER+torch or Presidio+spaCy) is never loaded in the parent
+    # (forwarding core) process.
     _engine = None  # lazy singleton within this subprocess
 
     def _run_ner(text: str):
         nonlocal _engine
         if _engine is None:
             # Deferred import: keeps the main process clean.
-            # This import triggers spaCy model loading on first call.
-            from pii_guard.stage2.korean_ner import KoreanNEREngine  # noqa: PLC0415
-            _engine = KoreanNEREngine()
+            # resolve_ner_backend reads PIIGUARD_NER_BACKEND (set by the parent
+            # Engine from env/policy); load_engine_class imports the matching
+            # engine, which triggers model loading on first detect().
+            from pii_guard.stage2.backend import (  # noqa: PLC0415
+                load_engine_class,
+                resolve_ner_backend,
+            )
+            engine_cls = load_engine_class(resolve_ner_backend())
+            _engine = engine_cls()
         return _engine.detect(text)
 
     while True:

@@ -129,7 +129,11 @@ def cmd_serve(args: argparse.Namespace) -> int:
         from .stage2.runner import Stage2NERRunner
 
         runner = Stage2NERRunner()
-    engine = Engine(stage2_runner=runner, proximity_config=policy.proximity)
+    engine = Engine(
+        stage2_runner=runner,
+        proximity_config=policy.proximity,
+        ner_backend=policy.ner_backend,   # R18: gliner(기본)/spacy. env PIIGUARD_NER_BACKEND가 우선
+    )
 
     proxy = PIIGuardProxy(
         args.upstream_url,

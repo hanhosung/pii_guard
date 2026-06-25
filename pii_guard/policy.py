@@ -237,6 +237,10 @@ class PolicyConfig:
     # ── Proximity (context-gated detection, R17) ─────────────────────────────
     proximity: ProximityConfig = field(default_factory=ProximityConfig)
 
+    # ── Stage2 NER 백엔드 (R18) ──────────────────────────────────────────────
+    # "gliner"(기본) | "spacy". 환경변수 PIIGUARD_NER_BACKEND가 있으면 그쪽이 우선.
+    ner_backend: str = "gliner"
+
     # ── Convenience helpers ──────────────────────────────────────────────────
 
     def get_category_policy(self, category: str) -> Optional[CategoryPolicy]:
@@ -458,6 +462,36 @@ def _parse_proximity(raw) -> ProximityConfig:
     )
 
 
+#: Stage2 NER 백엔드로 허용되는 값(R18)
+_VALID_NER_BACKENDS = {"gliner", "spacy"}
+
+
+def _parse_stage2_backend(raw) -> str:
+    """
+    ``stage2:`` 블록에서 ``ner_backend``를 파싱해 반환.
+
+    예시 YAML::
+
+        stage2:
+          ner_backend: gliner   # gliner(기본) | spacy(경량 폴백)
+
+    - ``stage2`` 자체는 매핑이어야 하고, ``ner_backend`` 키가 없으면 기본값 "gliner".
+    - 알 수 없는 값이면 ValueError(침묵 폴백 금지 — P3).
+    """
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"'stage2' must be a YAML mapping, got {type(raw).__name__}"
+        )
+    backend = raw.get("ner_backend", "gliner")
+    backend = str(backend).strip().lower()
+    if backend not in _VALID_NER_BACKENDS:
+        raise ValueError(
+            f"stage2.ner_backend must be one of {sorted(_VALID_NER_BACKENDS)}, "
+            f"got {raw.get('ner_backend')!r}"
+        )
+    return backend
+
+
 def _parse_channel_overrides(co_raw: dict) -> Dict[str, ChannelOverride]:
     """Parse and validate the ``channel_overrides`` block."""
     overrides: Dict[str, ChannelOverride] = {}
@@ -568,6 +602,10 @@ def _parse_and_validate(
     # ── Proximity (context-gated detection, R17) ─────────────────────────────
     if "proximity" in data:
         config.proximity = _parse_proximity(data["proximity"])
+
+    # ── Stage2 NER 백엔드 선택 (R18) ─────────────────────────────────────────
+    if "stage2" in data:
+        config.ner_backend = _parse_stage2_backend(data["stage2"])
 
     # ── Per-category overrides ───────────────────────────────────────────────
     if "categories" in data:

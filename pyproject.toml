@@ -19,7 +19,7 @@ dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
 ]
-# Stage-2 NER dependencies (Presidio + Korean spaCy model)
+# Stage-2 NER backend "spacy" (lightweight fallback): Presidio + Korean spaCy model.
 # Install with: pip install pii-guard[ner]
 # Then download a Korean model. ko_core_news_lg is preferred (better PERSON/ORG
 # recall); ko_core_news_sm is a lighter fallback. Model selection is automatic
@@ -30,6 +30,15 @@ ner = [
     "presidio-analyzer>=2.2",
     "presidio-anonymizer>=2.2",
     "spacy>=3.7",
+]
+# Stage-2 NER backend "gliner" (default, recall-first): GLiNER + PyTorch.
+# Install with: pip install pii-guard[ner-gliner]
+# Korean-specific model is downloaded on first use; default taeminlee/gliner_ko,
+# overridable via PIIGUARD_GLINER_MODEL. Select the backend with
+# PIIGUARD_NER_BACKEND=gliner|spacy or policy stage2.ner_backend (R18 / ADR-11).
+ner-gliner = [
+    "gliner>=0.2",
+    "torch>=2.0",
 ]
 # Interactive Streamlit UI (ui/app.py): chat + multi-file PII scan with console output.
 # Run with: streamlit run ui/app.py

@@ -74,6 +74,7 @@ class Engine:
         stage2_runner: Optional["Stage2NERRunner"] = None,     # (선택) Stage2 NER 워커. None이면 Stage1만
         proximity_enabled: bool = True,                        # proximity 켜기(기본 on)
         proximity_config: Optional[ProximityConfig] = None,    # (선택) 정책에서 온 proximity 설정
+        ner_backend: Optional[str] = None,                     # (선택) Stage2 NER 백엔드(정책값). env가 우선
     ) -> None:
         import os                                  # 환경변수 설정/난수 키 생성용
         self._categories = categories or ALL_CATEGORIES   # 안 주면 기본 전체 카테고리 사용
@@ -95,6 +96,13 @@ class Engine:
         # 항상 두 값을 (재)설정한다 → 이전 Engine이 남긴 옛 값이 새 Engine으로 새지 않도록.
         os.environ["PIIGUARD_NER_FILTER_OFF"] = "" if cfg.ner_filter_enabled else "1"  # 필터 끄면 "1"
         os.environ["PIIGUARD_NER_EXTRA_STOPWORDS"] = ",".join(cfg.ner_extra_stopwords) # 추가 deny-list를 콤마로
+
+        # Stage2 NER 백엔드 선택(R18)도 워커 서브프로세스로 env를 통해 전파한다.
+        # 우선순위 env > 정책 > 기본('gliner') — 이미 env가 있으면 사용자/CI 오버라이드를 존중하고,
+        # 없으면 정책값(ner_backend)을, 그것도 없으면 기본값을 env에 확정해 워커가 동일하게 읽게 한다.
+        from .stage2.backend import ENV_NER_BACKEND, resolve_ner_backend  # 경량 모듈(무거운 의존 없음)
+        # resolve가 알 수 없는 값이면 여기서 즉시 ValueError → serve 시작 시점에 명확히 실패(P3).
+        os.environ[ENV_NER_BACKEND] = resolve_ner_backend(ner_backend).value
 
         # 세션 단위 가변 상태(절대 디스크에 안 씀). 플레이스홀더 번호 부여는 모두 SessionMap이 담당.
         self._session_map = SessionMap()

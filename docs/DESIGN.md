@@ -304,7 +304,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 - **격리·degrade**: `Stage2NERRunner.scan(text, stage1_dets)` — 워커 타임아웃/OOM/예외 시
   Stage1 결과 반환 + `coverage_gap=True` + `fail_reason`. (백엔드 무관 동일)
 
-> **구현 상태(정직, P3)**: dual-backend 설계 확정 + spaCy 백엔드 배선·검증 완료. **GLiNER 백엔드(`stage2/gliner_ner.py`)·`resolve_ner_backend()`(`stage2/backend.py`)는 R18 신규 요구사항으로 코드 구현 진행 대상.** 아래 §6.4 GLiNER 행은 측정 예정(목표) 값이다.
+> **구현 상태(정직, P3)**: dual-backend 설계·배선 **구현 완료** — `stage2/backend.py`(`resolve_ner_backend`/`load_engine_class`)·`stage2/gliner_ner.py`(`GLiNERNEREngine`)·`_workers.py` 백엔드 분기·`policy.py`(`stage2.ner_backend`)·`Engine(ner_backend=)` env 전파·`serve` 연결. 선택 로직은 단위테스트(`tests/test_ner_backend.py`, 20케이스)로 검증. **단, GLiNER 런타임/품질은 실측 미완**(개발 환경에 gliner/torch 미설치 → `[ner-gliner]` 설치 후 동작·측정). 아래 §6.4 GLiNER 행은 측정 예정(목표) 값이다.
 
 ### 6.3 올바른 fast-path (요구사항 §6.3)
 - ❌ "Stage1 clean이면 NER 스킵"은 틀림(NER은 정규식이 놓친 걸 담당).
@@ -504,7 +504,7 @@ RedactionResult
 
 ## 17. 테스트 전략
 
-- **42개 테스트 파일 / 2685 passed / 12 skipped / 0 failed** (`.venv` + ko_core_news_lg).
+- **44개 테스트 파일 / 2725 passed / 12 skipped / 0 failed** (`.venv` + ko_core_news_lg; NER 백엔드 선택 로직 포함, GLiNER 런타임 제외).
 - 계층:
   - 단위: 카테고리·마스커·세션맵·정책·Ledger·복원·파서·트립와이어·스트리밍·NER 엔진.
   - 와이어: `test_{claude,openai,gemini}_wire.py` — 프로바이더 포맷 스크럽.
@@ -651,8 +651,9 @@ RedactionResult
   라이브러리만, 무영향).
 - **검증 책무**: GLiNER 실측치 확보 전까지 보증선은 spaCy 실측표(§6.4). GLiNER 실측이 목표(PERSON recall
   ≥0.90) 미달이면 **기본 백엔드 결정을 재평가**(ADR-11 재평가 트리거).
-- **구현 상태(정직, P3)**: spaCy 백엔드는 배선·검증 완료. GLiNER 백엔드·`resolve_ner_backend()` 배선은
-  R18 신규 요구사항으로 **코드 구현 진행 대상**.
+- **구현 상태(정직, P3)**: dual-backend **배선 구현 완료**(backend.py·gliner_ner.py·_workers.py·policy.py·
+  Engine·serve), 선택 로직 단위테스트 검증. GLiNER 런타임/품질 **실측은 `[ner-gliner]` 설치 후**(개발
+  환경 미설치).
 
 ---
 
