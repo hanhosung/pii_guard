@@ -788,7 +788,11 @@ RedactionResult
 - **민감정보 거버넌스(실 PII 학습 시)**: 학습 데이터는 **학습 전용 오프박스 호스트에서만**, **레포 미커밋**
   (`.gitignore`), 암호화 보관(P4 정합). 모델 가중치는 **희소 문자열 암기 위험** → 배포 전 암기/유출 점검(학습
   샘플을 모델이 그대로 재현하는지). 라이선스: 베이스 Apache → 가중치 Apache(상업 OK), 학습 데이터는 보유자 소유.
-- 구현 상태: **설계(R20) — 학습 서브시스템 구현 대상.**
+- **구현 상태: 파일럿 구현 완료(배선 검증).** `training/`(common·ingest·augment·split·train·eval) +
+  스키마·README·.gitignore·합성 샘플 작성. 결정적 파이프라인(augment→ingest→split)은 단위테스트
+  (`tests/test_training_pipeline.py`, 9케이스) 통과, `train.py`(1스텝 CPU 스모크)·`eval.py`(베이스↔파인튜닝
+  벤치마크+게이트)도 실제 gliner API로 동작 확인. 학습 의존 = `[ner-gliner-train]`(accelerate). 본 학습(실데이터·
+  GPU)은 사용자 환경에서 수행. ※ 채택 게이트 통과 후 런타임 통합 시 **질의 라벨 정렬**(schema.md §3) 필요.
 
 ---
 

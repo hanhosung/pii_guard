@@ -46,6 +46,12 @@ ner-gliner = [
     "torch>=2.0",
     "python-mecab-ko>=1.3",
 ]
+# Off-box GLiNER fine-tuning subsystem (training/, ADR-13). Builds on [ner-gliner].
+# Install with: pip install 'pii-guard[ner-gliner,ner-gliner-train]'  (GPU recommended)
+# Only needed to RUN training/train.py; not required for runtime inference.
+ner-gliner-train = [
+    "accelerate>=1.1.0",
+]
 # Interactive Streamlit UI (ui/app.py): chat + multi-file PII scan with console output.
 # Run with: streamlit run ui/app.py
 ui = [

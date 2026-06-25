@@ -1,0 +1,10 @@
+# 학습 데이터/산출물은 커밋 금지 (실 PII 보호 + 대용량 가중치). 코드·schema·sample만 추적.
+data/
+runs/
+models/
+*.jsonl
+!sample/raw_sample.jsonl
+*.pt
+*.safetensors
+*.bin
+__pycache__/
