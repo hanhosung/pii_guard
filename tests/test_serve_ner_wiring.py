@@ -38,8 +38,12 @@ def _run_cmd_serve(args: argparse.Namespace) -> MagicMock:
     Invoke cmd_serve with the proxy + blocking call mocked out, and return the
     patched PIIGuardProxy mock so the caller can inspect constructor kwargs.
     """
+    # Mock the NER warmup so this wiring unit test never spawns a worker or
+    # loads/downloads a model (keeps it fast and offline). Wiring is what's under
+    # test here, not warmup behaviour.
     with patch("pii_guard.cli.PIIGuardProxy") as proxy_cls, \
-            patch("pii_guard.cli.signal.pause", side_effect=_StopServe):
+            patch("pii_guard.cli.signal.pause", side_effect=_StopServe), \
+            patch("pii_guard.stage2.runner.Stage2NERRunner.warmup", return_value=True):
         proxy_cls.return_value.port = 4444
         with pytest.raises(_StopServe):
             cmd_serve(args)

@@ -288,6 +288,7 @@ ouroboros 본체(Python 3.14)와 별도로 **Stage2(GLiNER+PyTorch 또는 Presid
   - 추상화: `resolve_ner_backend()`가 백엔드를 결정하고, 백엔드별 리졸버가 모델을 고른다. 자세한 근거는 [`DESIGN.md`](./DESIGN.md) ADR-9·ADR-10·**ADR-11**.
 - **블록당 하드 타임아웃**(기본 ~500ms~1s): 모델이 멈추거나 너무 느리면 무한 대기하지 않고 **끊고 `stage2_fail_action`으로 처리**(§14 열화). → 가용성 보장. (백엔드 무관 동일)
 - **격리**: 무거운 모델은 **별도 워커 프로세스**(spawn)에서 돈다 → Stage2가 죽어도(OOM 등) 코어는 생존(§3.1). GLiNER가 더 무겁기 때문에 이 격리는 GLiNER 기본 채택의 전제다.
+- **워밍업(필수)**: GLiNER 콜드 로드(~14.4s)가 블록당 타임아웃(기본 10s)을 초과하면 매 요청이 degrade돼 이름·주소가 누출된다. `serve`는 시작 시 `Stage2NERRunner.warmup()`으로 모델을 **블록 타임아웃 밖**에서 1회 로드한 뒤 트래픽을 받는다. (실측·비교 = [`validation/NER_BACKEND_COMPARISON.md`](../validation/NER_BACKEND_COMPARISON.md))
 - **구현**: `stage2/gliner_ner.py`·`stage2/korean_ner.py`(백엔드 엔진) + `stage2/runner.py`(워커·타임아웃·열화, 백엔드 공통).
 
 > **구현 상태(정직 선언, P3)**: dual-backend **설계·배선·실측 모두 완료**. `stage2/backend.py`(`resolve_ner_backend`)·`stage2/gliner_ner.py`(`GLiNERNEREngine`)·`_workers.py` 분기·`policy.py` `stage2.ner_backend` 파싱·`Engine(ner_backend=…)` env 전파·`serve` 연결이 모두 배선되고 **선택 로직은 단위 테스트로 검증**됨(`tests/test_ner_backend.py`). **GLiNER 런타임·품질도 실측 완료** — `taeminlee/gliner_ko`로 스모크(`validation/gliner_smoke.py` PASS) + 코퍼스 벤치마크(`validation/gliner_benchmark.json`, 전 임계값 통과). 실측 결과 PERSON recall 0.84 → **0.978**(목표 ≥0.90 달성), 정밀도는 0.97 → 0.80 하락(재현율↑·정밀도↓ 가설 확인). 수치 상세 = §23.1·DESIGN §6.4.

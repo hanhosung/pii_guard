@@ -221,3 +221,33 @@ def test_engine_defaults_backend_env_to_gliner(monkeypatch):
     monkeypatch.delenv(ENV_NER_BACKEND, raising=False)
     Engine()
     assert os.environ[ENV_NER_BACKEND] == "gliner"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Runner warmup — loads the model outside the per-block timeout (no real model)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_runner_warmup_returns_true_on_ok(monkeypatch):
+    # Use the noop test worker (responds immediately, no model) to verify the
+    # warmup handshake without loading any backend.
+    from pii_guard.stage2 import _workers
+    from pii_guard.stage2.runner import Stage2NERRunner
+
+    r = Stage2NERRunner(_worker_target=_workers._test_noop_worker)
+    try:
+        assert r.warmup() is True
+    finally:
+        r.close()
+
+
+def test_runner_warmup_false_when_worker_times_out():
+    # The slow worker never responds; warmup must time out gracefully → False
+    # (non-fatal), and a short budget keeps the test quick.
+    from pii_guard.stage2 import _workers
+    from pii_guard.stage2.runner import Stage2NERRunner
+
+    r = Stage2NERRunner(_worker_target=_workers._test_slow_worker)
+    try:
+        assert r.warmup(timeout_seconds=1.0) is False
+    finally:
+        r.close()

@@ -124,6 +124,12 @@ class Stage2NERRunner:
 
     DEFAULT_TIMEOUT: float = 10.0
 
+    #: One-time model-load budget for :meth:`warmup`.  Heavy backends (e.g.
+    #: GLiNER cold-load ≈15 s) exceed the per-block ``DEFAULT_TIMEOUT``; warmup
+    #: pays that cost once, outside the request path, so real scans then run
+    #: against an already-loaded model within the strict per-block timeout.
+    WARMUP_TIMEOUT: float = 90.0
+
     def __init__(
         self,
         timeout_seconds: float = DEFAULT_TIMEOUT,
@@ -144,6 +150,41 @@ class Stage2NERRunner:
         self._resp_q: Optional[multiprocessing.Queue] = None
 
     # ── Public API ────────────────────────────────────────────────────────────
+
+    def warmup(self, timeout_seconds: Optional[float] = None) -> bool:
+        """
+        Pre-load the NER model in the worker, outside the per-block timeout.
+
+        Sends one tiny request and waits up to a generous budget
+        (:data:`WARMUP_TIMEOUT` by default) so a heavy backend such as GLiNER
+        (cold-load ≈15 s) finishes loading *before* real traffic arrives.  After
+        a successful warmup the worker keeps the model resident, so subsequent
+        :meth:`scan` calls complete within the strict per-block timeout instead
+        of timing out on the cold load and degrading to Stage-1 on every request.
+
+        Intended to be called once at ``serve`` start.  Failures are non-fatal:
+        the method returns ``False`` and the normal :meth:`scan` path will
+        degrade as usual.
+
+        Returns
+        -------
+        bool
+            ``True`` if the worker responded (model loaded), else ``False``.
+        """
+        budget = timeout_seconds if timeout_seconds is not None \
+            else max(self._timeout, self.WARMUP_TIMEOUT)
+        try:
+            self._ensure_worker_alive()
+            self._req_q.put("워밍업", block=True, timeout=2.0)
+            response = self._resp_q.get(block=True, timeout=budget)
+        except Exception:  # noqa: BLE001 — warmup is best-effort
+            self._reset_worker()
+            return False
+        return (
+            isinstance(response, tuple)
+            and len(response) == 2
+            and response[0] == "ok"
+        )
 
     def scan(
         self,

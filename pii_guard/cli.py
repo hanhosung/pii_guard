@@ -135,6 +135,23 @@ def cmd_serve(args: argparse.Namespace) -> int:
         ner_backend=policy.ner_backend,   # R18: gliner(기본)/spacy. env PIIGUARD_NER_BACKEND가 우선
     )
 
+    # Warm up the NER worker before serving so the model loads ONCE, outside the
+    # per-block timeout. Heavy backends (e.g. GLiNER cold-load ~15s) otherwise
+    # exceed the per-block timeout on the first request, get killed, and degrade
+    # to Stage-1 on *every* request (names/addresses leak). Engine() above set
+    # PIIGUARD_NER_BACKEND, so the worker loads the selected backend. Best-effort.
+    if runner is not None:
+        import os as _os
+        _backend = _os.environ.get("PIIGUARD_NER_BACKEND", "gliner")
+        sys.stderr.write(f"[PII-Guard] warming up Stage-2 NER backend ({_backend}) — "
+                         f"loading model, this can take ~15s...\n")
+        sys.stderr.flush()
+        _ok = runner.warmup()
+        sys.stderr.write(
+            f"[PII-Guard] NER warmup {'ready' if _ok else 'FAILED — will degrade per-request'}\n"
+        )
+        sys.stderr.flush()
+
     proxy = PIIGuardProxy(
         args.upstream_url,
         host=args.host,
