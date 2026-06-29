@@ -237,8 +237,9 @@ class PolicyConfig:
     # ── Proximity (context-gated detection, R17) ─────────────────────────────
     proximity: ProximityConfig = field(default_factory=ProximityConfig)
 
-    # ── Stage2 NER 백엔드 (R18) ──────────────────────────────────────────────
-    # "gliner"(기본) | "spacy". 환경변수 PIIGUARD_NER_BACKEND가 있으면 그쪽이 우선.
+    # ── Stage2 NER 백엔드 (R18 / R21) ────────────────────────────────────────
+    # "gliner"(기본) | "spacy" | "nunerzero"(평가 후보, R21·ADR-14).
+    # 환경변수 PIIGUARD_NER_BACKEND가 있으면 그쪽이 우선.
     ner_backend: str = "gliner"
 
     # ── Convenience helpers ──────────────────────────────────────────────────
@@ -463,7 +464,7 @@ def _parse_proximity(raw) -> ProximityConfig:
 
 
 #: Stage2 NER 백엔드로 허용되는 값(R18)
-_VALID_NER_BACKENDS = {"gliner", "spacy"}
+_VALID_NER_BACKENDS = {"gliner", "spacy", "nunerzero"}  # nunerzero = 평가 후보(R21·ADR-14)
 
 
 def _parse_stage2_backend(raw) -> str:

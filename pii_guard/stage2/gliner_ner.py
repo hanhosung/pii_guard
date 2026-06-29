@@ -109,7 +109,21 @@ class GLiNERNEREngine:
         True(기본)면 엔티티 끝의 한국어 조사를 떼어내 "홍길동은"→"홍길동".
     model_name:
         (선택) 모델 고정. None이면 로드 시 resolve_gliner_model()로 결정.
+
+    하위 클래스 확장점(서브클래스가 오버라이드)
+    -------------------------------------------
+    동계열(GLiNER 라이브러리 기반) 백엔드는 모델/식별자만 다르고 추론·후처리는 같다.
+    그래서 detect/_get_model 로직을 재사용하도록 다음 세 지점만 클래스 속성/메서드로 노출한다:
+      * ``_RULE_PREFIX``      — Detection.rule_id 접두(백엔드 식별).
+      * ``_MODEL_ENV_VAR``    — 모델 오버라이드 환경변수 이름(오류 메시지에 사용).
+      * ``_resolve_model_name()`` — 로드할 모델명 결정(env > 기본).
+    NuNER Zero 백엔드(`nunerzero_ner.py`)가 이 세 지점만 갈아끼워 재사용한다(R21·ADR-14).
     """
+
+    #: Detection.rule_id 접두 — 백엔드 구분용(서브클래스가 오버라이드)
+    _RULE_PREFIX = "ner_gliner"
+    #: 모델 오버라이드 환경변수 이름(서브클래스가 오버라이드)
+    _MODEL_ENV_VAR = _GLINER_MODEL_ENV_VAR
 
     def __init__(
         self,
@@ -135,15 +149,11 @@ class GLiNERNEREngine:
 
         model = self._get_model()                 # (필요 시 로드해) 모델 확보
         try:
-            # GLiNER 추론: 라벨 프롬프트로 엔티티 추출.
+            # 라벨 프롬프트로 엔티티 추출(서브클래스 확장점 _predict_entities).
             # 반환은 dict 리스트: {"start","end","text","label","score"}.
-            raw = model.predict_entities(
-                text,
-                _GLINER_LABELS,
-                threshold=self._min_confidence,   # 모델 단계에서 1차로 낮은 점수 컷
-            )
+            raw = self._predict_entities(model, text)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("GLiNER prediction failed: %s", exc)  # 추론 실패는 경고만
+            logger.warning("NER prediction failed: %s", exc)     # 추론 실패는 경고만
             return []                                            # 빈 결과로 안전 폴백
 
         detections: List[Detection] = []          # 변환 결과
@@ -177,7 +187,7 @@ class GLiNERNEREngine:
                 end=adjusted_end,
                 original=clean_text,
                 detection_stage=DetectionStage.STAGE2_NER,
-                rule_id=f"ner_gliner_{category.lower()}",  # 규칙 식별자(백엔드 구분용 접두)
+                rule_id=f"{self._RULE_PREFIX}_{category.lower()}",  # 규칙 식별자(백엔드 구분용 접두)
                 confidence=score,
             )
             detections.append(det)
@@ -189,16 +199,39 @@ class GLiNERNEREngine:
 
     # ── Private helpers ───────────────────────────────────────────────────────
 
+    def _predict_entities(self, model, text: str) -> List[dict]:
+        """
+        모델에서 원시 엔티티 dict 리스트를 얻는다(서브클래스 확장점).
+        반환 항목: ``{"start","end","text","label","score"}``.
+
+        GLiNER(span 분류)는 추출 결과가 이미 완전한 엔티티라 추가 병합이 불필요하다.
+        토큰 분류 계열(NuNER Zero)은 인접 조각을 병합해야 하므로 이 메서드를 오버라이드한다.
+        """
+        return model.predict_entities(
+            text,
+            _GLINER_LABELS,
+            threshold=self._min_confidence,       # 모델 단계에서 1차로 낮은 점수 컷
+        )
+
+    def _resolve_model_name(self) -> str:
+        """
+        로드할 모델명을 결정한다(서브클래스 확장점).
+        기본 = 생성자에 고정된 model_name > `resolve_gliner_model()`(env > Apache 기본).
+        NuNER Zero 등 동계열 백엔드는 이 메서드만 오버라이드해 다른 모델을 가리킨다.
+        """
+        return self._model_name or resolve_gliner_model()
+
     def _get_model(self):
         """
-        GLiNER 모델을 반환(첫 호출에 지연 로드).
+        GLiNER 라이브러리 모델을 반환(첫 호출에 지연 로드).
         gliner/torch import를 여기까지 미뤄, 메인 프로세스에 무거운 의존이 올라가지 않게 한다.
         의존 미설치 시 설치 안내와 함께 RuntimeError를 던진다.
+        (NuNER Zero도 동일하게 gliner 라이브러리로 로드되므로 이 경로를 공유한다.)
         """
         if self._model is not None:               # 이미 로드돼 있으면 재사용
             return self._model
 
-        model_name = self._model_name or resolve_gliner_model()  # 모델명 결정
+        model_name = self._resolve_model_name()   # 모델명 결정(서브클래스 확장점)
         try:
             from gliner import GLiNER             # 지연 임포트(여기서 torch까지 로드)
         except ImportError as exc:
@@ -207,12 +240,12 @@ class GLiNERNEREngine:
                 "Run: pip install 'pii-guard[ner-gliner]'  (installs gliner + torch)"
             ) from exc
 
-        logger.info("Loading GLiNER model for NER: %s", model_name)
+        logger.info("Loading NER model via gliner library: %s", model_name)
         try:
             self._model = GLiNER.from_pretrained(model_name)  # 모델 가중치 로드(무거움)
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(
-                f"Failed to load GLiNER model '{model_name}'. "
-                f"Check the model name or set {_GLINER_MODEL_ENV_VAR}."
+                f"Failed to load NER model '{model_name}'. "
+                f"Check the model name or set {self._MODEL_ENV_VAR}."
             ) from exc
         return self._model

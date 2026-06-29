@@ -101,7 +101,8 @@ PII-Guard는 에이전트와 **같은 PC에서 나란히 도는 협조적 도구
 | **GLiNER** | 라벨 프롬프트로 임의 엔티티를 뽑는 **제로샷 NER**(트랜스포머). Stage2 **기본 백엔드**(기본 모델 urchade/gliner_multi_pii-v1, Apache-2.0). §20.2·§20.3. |
 | **Presidio** | MS의 오픈소스 PII 탐지 **프레임워크**(NER+정규식+신뢰도 통합). spaCy 백엔드에서 사용. §20.1. |
 | **spaCy** | NLP 라이브러리. `ko_core_news_lg` = 한국어 NER 모델. Stage2 **경량 폴백 백엔드**. §20.2. |
-| **NER 백엔드** | Stage2 엔진을 **GLiNER(기본) / spaCy(폴백)** 중 선택하는 추상화. env `PIIGUARD_NER_BACKEND` 또는 정책 `stage2.ner_backend`. §20.3(ADR-11). |
+| **NuNER Zero** | GLiNER 동계열 제로샷 NER(`numind/NuNER_Zero`, MIT). **토큰 분류** 구조라 긴/복합 엔티티에 강점. Stage2 **평가 후보 백엔드**(벤치 비교 후 채택 게이트). §20.6(ADR-14). |
+| **NER 백엔드** | Stage2 엔진을 **GLiNER(기본) / spaCy(폴백) / NuNER Zero(평가 후보)** 중 선택하는 추상화. env `PIIGUARD_NER_BACKEND` 또는 정책 `stage2.ner_backend`. §20.3(ADR-11). |
 | **rehydrate/scrub** | scrub=요청에서 PII 제거(마스킹), rehydrate=응답에서 되돌림. |
 
 ---
@@ -195,6 +196,7 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 | `stage2/_workers.py` | `default_ner_worker_loop`, (테스트용 `_test_noop/slow/oom_worker`) | **서브프로세스에서 도는 워커 루프.** `resolve_ner_backend()`로 선택된 엔진(`GLiNERNEREngine` 또는 `KoreanNEREngine`)을 **지연 임포트**해 무거운 모델 로딩을 부모(코어)와 격리. 두 엔진 모두 동일한 `.detect(text)→List[Detection]` 인터페이스라 워커 루프는 백엔드 무관. 테스트 워커들은 열화 경로(타임아웃·OOM)를 결정적으로 재현. |
 | `stage2/backend.py` | `resolve_ner_backend()`, `NERBackend`(Enum) | **백엔드 선택 추상화(R18·ADR-11).** `PIIGUARD_NER_BACKEND` env > 정책 `stage2.ner_backend` > 기본 `gliner` 순으로 백엔드 결정. 선택된 백엔드의 엔진 클래스를 반환(지연 임포트). |
 | `stage2/gliner_ner.py` | `GLiNERNEREngine`, `.detect(text)`, `resolve_gliner_model()` | **GLiNER 엔진(기본 백엔드).** `resolve_gliner_model`이 `PIIGUARD_GLINER_MODEL` > Apache 기본 `urchade/gliner_multi_pii-v1`(상업 가능) 순으로 모델 선택(비상업 시 `taeminlee/gliner_ko`). 라벨 프롬프트(`사람`·`주소`·`조직`)로 제로샷 추출 후 PERSON/ADDRESS/ORGANIZATION 매핑, `min_confidence` 미만 폐기, 조사 제거 재사용. 출력은 `korean_ner.py`와 동일한 `Detection`. |
+| `stage2/nunerzero_ner.py` *(R21·구현 완료)* | `NuNERZeroNEREngine`, `.detect(text)`, `resolve_nunerzero_model()`, `_merge_adjacent_entities()` | **NuNER Zero 엔진(평가 후보 백엔드, ADR-14).** `resolve_nunerzero_model`이 `PIIGUARD_NUNERZERO_MODEL` > 기본 `numind/NuNER_Zero`(MIT·상업 가능) 순으로 선택. **토큰 분류** 제로샷 → 라벨(`사람`·`주소`·`조직`)로 추출 후 PERSON/ADDRESS/ORGANIZATION 매핑. GLiNER 라이브러리로 로드돼 추론·후처리는 부모 `GLiNERNEREngine` 상속, **토큰분류 보정용 `_merge_adjacent_entities`**(인접 동일 라벨 스팬 병합)만 추가. 출력은 동일한 `Detection`. **코퍼스 게이트 FAIL → GLiNER 기본 유지(§20.6).** |
 | `stage2/korean_ner.py` | `KoreanNEREngine`, `.detect(text)`, `resolve_ko_spacy_model()` | **spaCy NER 엔진(경량 폴백 백엔드, Presidio+spaCy).** `resolve_ko_spacy_model`이 `PIIGUARD_KO_SPACY_MODEL`>`lg`>`sm` 순으로 모델 선택. `_build_presidio_analyzer`가 한국어 전용 `AnalyzerEngine` 구성, `_strip_ko_particle`로 조사 제거("홍길동은"→"홍길동"). spaCy 라벨(PS/LC/OG)→PERSON/ADDRESS/ORGANIZATION 매핑. |
 | `stage2/policy_layer.py` | `Stage2PolicyLayer`, `Stage2PolicyResult` | **Stage2 탐지에 정책 적용.** NER가 찾은 엔티티에 카테고리별 액션(mask)·신뢰도 임계값을 입혀 최종 처리 결정 산출. |
 | `stage2/ner_filters.py` | `is_ner_false_positive(category, text)` | **음성 proximity / NER FP 후필터.** NER 탐지 중 코드토큰(`API_KEY`,`send_email(...)`)·약어(`AWS`,`LGTM`)·base64 blob·일반명사 deny-list(`주석`,`수익자`)를 제거. **제거만**(recall-safe). 정밀도 0.79→0.87. |
@@ -305,7 +307,11 @@ PII-Guard는 **로컬 인터셉트 프록시**다. ouroboros 워크플로·LLM C
 - **`spacy` (경량 폴백 백엔드)** — `KoreanNEREngine`: Presidio `AnalyzerEngine` + spaCy 한국어 모델.
   - 모델 해석(`resolve_ko_spacy_model`): `PIIGUARD_KO_SPACY_MODEL` env > `ko_core_news_lg` > `ko_core_news_sm`.
   - spaCy 라벨 → 엔티티 매핑: `PS→PERSON, LC→LOCATION(=ADDRESS), OG→ORGANIZATION`.
-- **공통**: 한국어 조사 스트리핑("홍길동은"→"홍길동"), `min_confidence`(기본 0.50) 미만 폐기.
+- **`nunerzero` (평가 후보 백엔드, R21·ADR-14)** — `NuNERZeroNEREngine`(구현 완료):
+  - 모델 해석(`resolve_nunerzero_model`): `PIIGUARD_NUNERZERO_MODEL` env > 기본 `numind/NuNER_Zero`(MIT·상업 가능).
+  - GLiNER와 동계열 제로샷이나 **토큰 분류** 구조 → 긴/복합 엔티티(ADDRESS·ORG 경계)에 강점 가설. 추론·후처리는 부모 GLiNER 상속 + 인접 조각 병합(`_merge_adjacent_entities`)만 추가.
+  - **코퍼스 벤치(seed=42·spf=10·임계값 0.50/0.35) 결과 게이트 FAIL** — PERSON·ORG 재현율 회귀로 GLiNER 기본 유지. ADDRESS 우위·ORG 정밀도 개선은 확인(상세 §20.6).
+- **공통**: 한국어 조사 스트리핑("홍길동은"→"홍길동"), `min_confidence`(기본 0.50) 미만 폐기. (3개 백엔드 동일)
 - **추출 임계값 노브(R20·ADR-12)**: 위 `min_confidence`(= NER 스팬 점수 컷, 레이어 (b))를
   `stage2.ner_min_confidence`/`PIIGUARD_NER_MIN_CONFIDENCE`로 노출(전역, env>정책>0.50). ⚠️ 카테고리 규칙
   신뢰도(`CategoryPolicy.min_confidence`, 레이어 (a))와 **다른 것**. recall-우선이라 0.5→0.35 권장(실측: ADDRESS
@@ -562,7 +568,7 @@ RedactionResult
 5. **단일 프로세스 권한 모델** — 별도 UID 미적용(단일 사용자 가정).
 6. **ouroboros 오케스트레이터 종결** — 3차 run은 벤치 타임아웃으로 FAILED 기록(코드는 건전, 로컬 2640 통과). 4차 closure run 준비됨.
 
-**2차 로드맵(요구사항 §19)**: egress 락다운+break-glass, hwp/OCR, proxy_held/tokenize_roundtrip, transformer NER, 서명 자동 룰 갱신, VM/샌드박스(티어3).
+**2차 로드맵(요구사항 §19)**: egress 락다운+break-glass, hwp/OCR, proxy_held/tokenize_roundtrip, **NuNER Zero 백엔드 후보 벤치 비교·채택 평가(R21·ADR-14)**, transformer NER, 서명 자동 룰 갱신, VM/샌드박스(티어3).
 
 ---
 
@@ -583,6 +589,7 @@ RedactionResult
 | **ADR-11** | **NER 백엔드 선택 메커니즘 = env + 정책 YAML, 기본 gliner** | `PIIGUARD_NER_BACKEND` > `stage2.ner_backend` > 기본 `gliner`. 동일 인터페이스·동일 카테고리로 후단 백엔드 무관. 상세 §20.3. |
 | **ADR-12** | **NER 추출 임계값 노출 = 전역 정책/env 노브**(R20) | GLiNER/spaCy의 스팬 점수 컷(`min_confidence`)을 `stage2.ner_min_confidence`/`PIIGUARD_NER_MIN_CONFIDENCE`로 노출(ADR-11 패턴 재사용). **카테고리 규칙 신뢰도(다른 레이어)와 구분.** recall-우선이라 낮춤 유리(0.5→0.35). 상세 §20.4. |
 | **ADR-13** | **GLiNER 파인튜닝 라이프사이클 = 런타임 무변경 + 오프박스 학습**(R20) | 파인튜닝 모델은 기존 모델 슬롯(`PIIGUARD_GLINER_MODEL`)으로 소비(코어 무변경). 학습은 별도 `training/` 서브시스템(대량 보유 데이터 1급 입력 + eval 게이트 + 민감정보 거버넌스). Apache 베이스→산출물 상업 가능. 상세 §20.5. |
+| **ADR-14** | **NuNER Zero 백엔드 후보 평가 = 벤치 비교 후 게이트 채택**(R21) | GLiNER 동급 인코더 NER `numind/NuNER_Zero`(MIT·상업 가능)를 ADR-11 추상화에 세 번째 백엔드(`nunerzero`)로 배선하고 동일 평가셋으로 GLiNER·spaCy와 대조. **토큰 분류 구조 → ORG/ADDRESS 경계 강점** 가설을 ORG 정밀도(0.774)에 검증. 채택 게이트(recall 무회귀 + ORG 정밀도/F1 개선 + 런타임 예산) 통과 시에만 정식 옵션 승격. 상세 §20.6. |
 
 ---
 
@@ -793,6 +800,62 @@ RedactionResult
   (`tests/test_training_pipeline.py`, 9케이스) 통과, `train.py`(1스텝 CPU 스모크)·`eval.py`(베이스↔파인튜닝
   벤치마크+게이트)도 실제 gliner API로 동작 확인. 학습 의존 = `[ner-gliner-train]`(accelerate). 본 학습(실데이터·
   GPU)은 사용자 환경에서 수행. ※ 채택 게이트 통과 후 런타임 통합 시 **질의 라벨 정렬**(schema.md §3) 필요.
+
+---
+
+## 20.6 ADR-14 (상세) — NuNER Zero 백엔드 후보 평가 (동급 인코더 NER 벤치 비교)
+
+**맥락(Context).** GLiNER 대안 조사(보고서 §2.3 + 외부 벤치)에서, GLiNER와 **유사 성능을 내는 동급 인코더
+NER** 중 PII-Guard 제약(완전 로컬·결정적·인젝션 불가·한국어·**상업 라이선스**·임의 라벨)을 동시에 만족하는
+후보는 사실상 **NuNER Zero**(`numind/NuNER_Zero`, MIT)가 유일했다. Piiranha(DeBERTa, 86M)는 영어/네덜란드어·
+고정 라벨이라 부적합, NuExtract/UIE 계열은 생성형이라 DR-1(ADR-8)에 위배. NuNER Zero는 GLiNER 동계열
+제로샷이면서 **토큰 분류** 구조라, ADR-12 임계값으로 풀리지 않는 **ORG 정밀도 0.774**(긴/복합 엔티티 경계
+오류) 개선 가능성이 있다(외부 보고: GLiNER Large v2.1 대비 약 +3%, 멀티워드 강점).
+
+**결정(Decision).** **무조건 교체가 아니라, 배선 후 벤치 비교 → 채택 게이트** 절차로 평가한다.
+
+1. **어댑터 배선(ADR-10/11 정합).** `stage2/nunerzero_ner.py`(`NuNERZeroNEREngine`)를 신설하고
+   `resolve_ner_backend()`에 `NERBackend.NUNERZERO`를 추가. 선택 = `PIIGUARD_NER_BACKEND=nunerzero` >
+   정책 `stage2.ner_backend: nunerzero`, 모델 변형 = `PIIGUARD_NUNERZERO_MODEL` > 기본 `numind/NuNER_Zero`.
+   **출력은 동일 `Detection`(PERSON/ADDRESS/ORGANIZATION)** — `_workers.py`·타임아웃·degrade·proximity
+   후필터·`min_confidence` 컷·조사 스트리핑 경로는 **무변경 재사용**(후단 백엔드 무관 원칙 유지).
+2. **벤치 비교(동일 하니스).** `benchmarks/korean_ner_benchmark.py --ner-backend nunerzero`로 **코퍼스
+   ground-truth(seed=42)** + **외부 6리포트(claude·codex·gemini)** 양쪽에서 카테고리별 P/R/F1 측정,
+   GLiNER·spaCy와 동일 표로 대조 → `validation/NER_BACKEND_COMPARISON.md` 갱신.
+3. **채택 게이트.** (a) 어떤 카테고리도 GLiNER 대비 **recall 회귀 없음**, (b) **ORG 정밀도(0.774) 개선**
+   또는 종합 F1 우위, (c) 런타임 예산(메모리·콜드로드·p95 워밍업) 충족 — **셋 다 충족 시에만** 정식 옵션
+   (필요 시 기본)으로 승격. 불통과 시 비교 결과만 기록하고 **GLiNER 기본 유지**.
+
+**근거(Rationale).**
+- 백엔드 추상화(ADR-11)가 이미 있어 **세 번째 엔진 추가가 후단 무변경**으로 가능 → 낮은 비용의 실험.
+- MIT 라이선스라 현 Apache 정책과 무충돌(산출물 상업 사용 OK), `taeminlee/gliner_ko`(CC-BY-NC)가 막힌
+  "한국어 특화 + 상업" 빈자리의 대안 가설.
+- **비생성형 인코더**라 DR-1(ADR-8)의 인젝션-불가·결정성 성질을 그대로 유지 → 보안 모델 불변.
+
+**결과·트레이드오프 / 거버넌스.**
+- **게이트 우선(P3 거짓 안심 금지)**: 외부 보고의 "+3%"는 영어권 일반 NER 기준 — **한국어 PII 카테고리에서
+  재측정 전에는 우위로 간주하지 않는다.** 실측이 곧 판정.
+- 평가 누설 방지: ADR-13과 동일하게 학습/튜닝 없이 **추론-only 비교**라 누설 위험은 낮으나, 임계값 스윕은
+  GLiNER와 **동일 그리드**(0.35/0.50)로 공정 비교.
+- **구현 상태: 어댑터·병합 후처리·벤치·게이트 구현 완료 + 코퍼스 1차 실측 완료.**
+  - 산출물: `stage2/nunerzero_ner.py`(`NuNERZeroNEREngine` + 토큰분류용 `_merge_adjacent_entities`),
+    `backend.py`(NUNERZERO 분기), `policy.py`(검증값 추가), `benchmarks/korean_ner_benchmark.py`
+    (`--ner-backend nunerzero`), **`benchmarks/compare_ner_backends.py`**(대조표+게이트 자동판정),
+    테스트(`tests/test_ner_backend.py`·`tests/test_compare_ner_backends.py`).
+  - **코퍼스 실측 결과(seed=42·samples_per_format=10) = 게이트 FAIL ❌ → GLiNER 기본 유지.**
+    임계값 0.50/0.35 양쪽에서 PERSON·ORG **재현율 회귀**(0.50: PERSON 0.978→0.856·ORG 0.980→0.800,
+    0.35: PERSON 1.000→0.922·ORG 0.980→0.900). macro-F1도 GLiNER 우위(0.961 vs 0.943 @0.35).
+  - **단, 가설은 부분 입증**: NuNER Zero가 **ADDRESS 우위**(P/R 동시, merge 효과)·**ORG 정밀도 개선**
+    (0.875→0.909). 보안=recall 1순위 도구라 PERSON/ORG 재현율 회귀가 채택 차단 사유.
+  - **외부 6리포트 셋도 실행(재구성 리플레이) = 동일 결론.** 원본 입력 JSON·하니스는 없으나 GLiNER 리포트가
+    케이스 텍스트·정답을 임베드해, 이를 파싱해 50케이스(claude 30·codex 10·gemini 10)를 복원하고 GLiNER·NuNER Zero를
+    같은 하니스로 재채점(`validation/external_replay.py`). **GLiNER 재채점치가 원본과 정확히 일치해 하니스 검증됨.**
+    NuNER Zero는 현실형 데이터에서 **PERSON 재현율이 더 크게 붕괴**(codex/gemini 1.00/0.80 → 0.20/0.20),
+    종합 재현율도 전 데이터셋 열세(claude 0.863·codex 0.899·gemini 0.819 vs GLiNER 0.966·0.989·0.931).
+  - **재평가 여지(미실행)**: ① ORG hard-negative 관점 재평가 ② 런타임 예산(메모리·콜드로드·p95).
+    증거 = `validation/NUNERZERO_TEST_2026-06-29.md`(결과 리포트)·
+    `EXTERNAL_LLM_TEST_2026-06-23_*_NuNERZero.md`(외부 3리포트)·`NER_BACKEND_COMPARISON_nunerzero.md`(코퍼스 대조표)·
+    `external_replay_*.json`·`ner_corpus_*.json`(카테고리 TP/FP/FN).
 
 ---
 

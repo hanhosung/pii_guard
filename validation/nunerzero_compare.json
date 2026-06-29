@@ -1,0 +1,161 @@
+{
+  "cells": [
+    {
+      "backend": "gliner",
+      "min_confidence": 0.5,
+      "ner_available": true,
+      "load_error": null,
+      "metrics": {
+        "PERSON": {
+          "precision": 0.967,
+          "recall": 0.9778,
+          "tp": 88,
+          "fp": 3,
+          "fn": 2
+        },
+        "ADDRESS": {
+          "precision": 0.9592,
+          "recall": 0.94,
+          "tp": 47,
+          "fp": 2,
+          "fn": 3
+        },
+        "ORGANIZATION": {
+          "precision": 0.875,
+          "recall": 0.98,
+          "tp": 49,
+          "fp": 7,
+          "fn": 1
+        }
+      },
+      "macro_f1": 0.9488
+    },
+    {
+      "backend": "gliner",
+      "min_confidence": 0.35,
+      "ner_available": true,
+      "load_error": null,
+      "metrics": {
+        "PERSON": {
+          "precision": 0.9574,
+          "recall": 1.0,
+          "tp": 90,
+          "fp": 4,
+          "fn": 0
+        },
+        "ADDRESS": {
+          "precision": 0.9615,
+          "recall": 1.0,
+          "tp": 50,
+          "fp": 2,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.875,
+          "recall": 0.98,
+          "tp": 49,
+          "fp": 7,
+          "fn": 1
+        }
+      },
+      "macro_f1": 0.961
+    },
+    {
+      "backend": "nunerzero",
+      "min_confidence": 0.5,
+      "ner_available": true,
+      "load_error": null,
+      "metrics": {
+        "PERSON": {
+          "precision": 0.9872,
+          "recall": 0.8556,
+          "tp": 77,
+          "fp": 1,
+          "fn": 13
+        },
+        "ADDRESS": {
+          "precision": 0.9804,
+          "recall": 1.0,
+          "tp": 50,
+          "fp": 1,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.9091,
+          "recall": 0.8,
+          "tp": 40,
+          "fp": 4,
+          "fn": 10
+        }
+      },
+      "macro_f1": 0.9193
+    },
+    {
+      "backend": "nunerzero",
+      "min_confidence": 0.35,
+      "ner_available": true,
+      "load_error": null,
+      "metrics": {
+        "PERSON": {
+          "precision": 0.9765,
+          "recall": 0.9222,
+          "tp": 83,
+          "fp": 2,
+          "fn": 7
+        },
+        "ADDRESS": {
+          "precision": 0.9615,
+          "recall": 1.0,
+          "tp": 50,
+          "fp": 2,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.9,
+          "recall": 0.9,
+          "tp": 45,
+          "fp": 5,
+          "fn": 5
+        }
+      },
+      "macro_f1": 0.943
+    }
+  ],
+  "gate": {
+    "candidate": "nunerzero",
+    "baseline": "gliner",
+    "recall_tolerance": 0.0,
+    "passed": false,
+    "per_threshold": [
+      {
+        "min_confidence": 0.35,
+        "evaluable": true,
+        "passed": false,
+        "no_recall_regression": false,
+        "recall_regressions": [
+          "PERSON recall 0.922 < 1.000 (baseline) by 0.078",
+          "ORGANIZATION recall 0.900 < 0.980 (baseline) by 0.080"
+        ],
+        "org_precision_gain": true,
+        "macro_f1_win": false,
+        "candidate_macro_f1": 0.943,
+        "baseline_macro_f1": 0.961
+      },
+      {
+        "min_confidence": 0.5,
+        "evaluable": true,
+        "passed": false,
+        "no_recall_regression": false,
+        "recall_regressions": [
+          "PERSON recall 0.856 < 0.978 (baseline) by 0.122",
+          "ORGANIZATION recall 0.800 < 0.980 (baseline) by 0.180"
+        ],
+        "org_precision_gain": true,
+        "macro_f1_win": false,
+        "candidate_macro_f1": 0.9193,
+        "baseline_macro_f1": 0.9488
+      }
+    ],
+    "note": "Runtime budget (memory/cold-load/p95) is NOT checked here — verify separately before promotion (ADR-14)."
+  }
+}
