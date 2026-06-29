@@ -73,6 +73,18 @@ def test_load_engine_class_gliner():
     assert load_engine_class(NERBackend.GLINER) is GLiNERNEREngine
 
 
+def test_load_engine_class_nunerzero():
+    # NuNER Zero candidate (R21/ADR-14) — also lazy; loads via the gliner library.
+    from pii_guard.stage2.nunerzero_ner import NuNERZeroNEREngine
+
+    assert load_engine_class(NERBackend.NUNERZERO) is NuNERZeroNEREngine
+
+
+def test_nunerzero_backend_resolves_from_env(monkeypatch):
+    monkeypatch.setenv(ENV_NER_BACKEND, "nunerzero")
+    assert resolve_ner_backend("gliner") is NERBackend.NUNERZERO
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # GLiNERNEREngine.detect — mapping logic with a fake model (no torch needed)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -154,6 +166,107 @@ def test_gliner_detect_empty_text_returns_empty():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# NuNERZeroNEREngine — candidate backend (R21/ADR-14)
+# Reuses the GLiNER detect path (same gliner library API), so we verify the
+# overridden identity points: model name, env var, and rule_id prefix.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_nunerzero_default_model_and_env(monkeypatch):
+    from pii_guard.stage2.nunerzero_ner import (
+        NuNERZeroNEREngine,
+        resolve_nunerzero_model,
+    )
+
+    monkeypatch.delenv("PIIGUARD_NUNERZERO_MODEL", raising=False)
+    eng = NuNERZeroNEREngine()  # lazy — no model load
+    assert eng._resolve_model_name() == "numind/NuNER_Zero"  # MIT default
+    assert eng._MODEL_ENV_VAR == "PIIGUARD_NUNERZERO_MODEL"
+    assert resolve_nunerzero_model() == "numind/NuNER_Zero"
+
+
+def test_nunerzero_model_env_override(monkeypatch):
+    from pii_guard.stage2.nunerzero_ner import NuNERZeroNEREngine
+
+    monkeypatch.setenv("PIIGUARD_NUNERZERO_MODEL", "local/finetuned-nunerzero")
+    assert NuNERZeroNEREngine()._resolve_model_name() == "local/finetuned-nunerzero"
+
+
+def test_nunerzero_detect_uses_nunerzero_rule_prefix():
+    # Inject a fake model (no torch) and confirm the inherited detect path emits
+    # the candidate's rule_id prefix and the same normalized categories as GLiNER.
+    from pii_guard.stage2.nunerzero_ner import NuNERZeroNEREngine
+
+    text = "김철수 씨가 서울특별시 강남구 삼성전자에 다닌다."
+    entities = [
+        {"start": 0, "end": 3, "text": "김철수", "label": "사람", "score": 0.95},
+        {"start": 7, "end": 15, "text": "서울특별시 강남구", "label": "주소", "score": 0.9},
+        {"start": 16, "end": 20, "text": "삼성전자", "label": "회사", "score": 0.88},
+    ]
+    eng = NuNERZeroNEREngine()
+    eng._model = _FakeGLiNERModel(entities)  # identical predict_entities API
+    dets = eng.detect(text)
+
+    assert {d.category for d in dets} == {"PERSON", "ADDRESS", "ORGANIZATION"}
+    for d in dets:
+        assert d.detection_stage.value == "stage2_ner"
+        assert d.rule_id.startswith("ner_nunerzero_")   # candidate prefix, not ner_gliner_
+        assert d.category_class.value == "korean_pii"
+
+
+def test_nunerzero_merge_adjacent_same_label():
+    # Token-classifier output fragments one address into two adjacent spans;
+    # _merge_adjacent_entities must stitch them back into one.
+    from pii_guard.stage2.nunerzero_ner import _merge_adjacent_entities
+
+    text = "서울특별시 강남구"  # one address, but model split it
+    frags = [
+        {"start": 0, "end": 5, "text": "서울특별시", "label": "주소", "score": 0.8},
+        {"start": 6, "end": 9, "text": "강남구", "label": "주소", "score": 0.9},
+    ]
+    merged = _merge_adjacent_entities(frags, text)
+    assert len(merged) == 1
+    assert merged[0]["start"] == 0 and merged[0]["end"] == 9
+    assert merged[0]["text"] == "서울특별시 강남구"
+    assert merged[0]["score"] == 0.9   # conservative max
+
+
+def test_nunerzero_merge_keeps_different_labels_separate():
+    from pii_guard.stage2.nunerzero_ner import _merge_adjacent_entities
+
+    text = "김철수 삼성전자"
+    frags = [
+        {"start": 0, "end": 3, "text": "김철수", "label": "사람", "score": 0.9},
+        {"start": 4, "end": 8, "text": "삼성전자", "label": "회사", "score": 0.9},
+    ]
+    merged = _merge_adjacent_entities(frags, text)
+    assert len(merged) == 2  # different labels → not merged
+
+
+def test_nunerzero_merge_empty_returns_empty():
+    from pii_guard.stage2.nunerzero_ner import _merge_adjacent_entities
+
+    assert _merge_adjacent_entities([], "anything") == []
+
+
+def test_nunerzero_detect_merges_fragments_end_to_end():
+    # Through the full detect() path: fragmented address spans collapse to one
+    # ADDRESS Detection with the restored boundary.
+    from pii_guard.stage2.nunerzero_ner import NuNERZeroNEREngine
+
+    text = "주소는 서울특별시 강남구 입니다"
+    frags = [
+        {"start": 4, "end": 9, "text": "서울특별시", "label": "주소", "score": 0.8},
+        {"start": 10, "end": 13, "text": "강남구", "label": "주소", "score": 0.85},
+    ]
+    eng = NuNERZeroNEREngine()
+    eng._model = _FakeGLiNERModel(frags)
+    dets = eng.detect(text)
+    assert len(dets) == 1
+    assert dets[0].category == "ADDRESS"
+    assert dets[0].original == "서울특별시 강남구"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Policy parsing — stage2.ner_backend
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -170,6 +283,15 @@ def test_policy_parses_stage2_backend(tmp_path):
     p.write_text("stage2:\n  ner_backend: spacy\n", encoding="utf-8")
     cfg = load_policy(str(p))
     assert cfg.ner_backend == "spacy"
+
+
+def test_policy_parses_nunerzero_backend(tmp_path):
+    from pii_guard.policy import load_policy
+
+    p = tmp_path / "policy.yaml"
+    p.write_text("stage2:\n  ner_backend: nunerzero\n", encoding="utf-8")
+    cfg = load_policy(str(p))
+    assert cfg.ner_backend == "nunerzero"
 
 
 def test_policy_invalid_stage2_backend_rejected():

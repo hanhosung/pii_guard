@@ -1,0 +1,1497 @@
+{
+  "aggregate": {
+    "tp": 176,
+    "fn": 28,
+    "fp": 23,
+    "precision": 0.8844,
+    "recall": 0.8627
+  },
+  "per_category": {
+    "PERSON": {
+      "tp": 23,
+      "fn": 19
+    },
+    "PHONE": {
+      "tp": 34,
+      "fn": 1
+    },
+    "EMAIL": {
+      "tp": 26,
+      "fn": 0
+    },
+    "RRN": {
+      "tp": 9,
+      "fn": 2
+    },
+    "ADDRESS": {
+      "tp": 25,
+      "fn": 1
+    },
+    "KR_ACCOUNT": {
+      "tp": 17,
+      "fn": 1
+    },
+    "CARD": {
+      "tp": 6,
+      "fn": 0
+    },
+    "AWS_SECRET": {
+      "tp": 2,
+      "fn": 0
+    },
+    "API_KEY": {
+      "tp": 5,
+      "fn": 0
+    },
+    "PASSWORD": {
+      "tp": 5,
+      "fn": 0
+    },
+    "ORGANIZATION": {
+      "tp": 7,
+      "fn": 4
+    },
+    "PASSPORT": {
+      "tp": 3,
+      "fn": 0
+    },
+    "DRIVER_LICENSE": {
+      "tp": 3,
+      "fn": 0
+    },
+    "BIZ_NO": {
+      "tp": 7,
+      "fn": 0
+    },
+    "FOREIGN_REG": {
+      "tp": 1,
+      "fn": 0
+    },
+    "GCP_KEY": {
+      "tp": 1,
+      "fn": 0
+    },
+    "TOKEN": {
+      "tp": 1,
+      "fn": 0
+    },
+    "PRIVATE_KEY": {
+      "tp": 1,
+      "fn": 0
+    }
+  },
+  "cases": [
+    {
+      "id": "01",
+      "title": "고객 상담 메모",
+      "text": "오늘 오전에 김서연 고객님이 직접 전화 주셨습니다. 연락처는 010-3344-5566이고, 추가 안내는 이메일 seoyeon.kim@gmail.com 으로 보내달라고 하셨어요. 본인 확인 과정에서 주민등록번호 920723-1641620 불러주셨는데 시스템에 저장은 안 했습니다. 배송지는 서울 마포구 월드컵북로 120 3층이고, 환불 계좌는 국민은행 123456-78-901234 라고 하셨습니다. 결제했던 카드 4111-1111-1111-1111 끝자리가 안 맞아 재확인 요청 드렸고요. 참고로 상담 티켓 번호는 ORD-20240613-0091 입니다. 다음 상담은 6월 20일 오후 2시로 예약했습니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "김서연"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-3344-5566"
+        },
+        {
+          "category": "EMAIL",
+          "value": "seoyeon.kim@gmail.com"
+        },
+        {
+          "category": "RRN",
+          "value": "920723-1641620"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 마포구 월드컵북로 120"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "123456-78-901234"
+        },
+        {
+          "category": "CARD",
+          "value": "4111-1111-1111-1111"
+        }
+      ],
+      "tp": 6,
+      "fn": 1,
+      "fp": 0,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "김서연"
+        }
+      ],
+      "extra": []
+    },
+    {
+      "id": "02",
+      "title": "개발자 슬랙 메시지 (시크릿 유출)",
+      "text": "@here 긴급합니다. 방금 스테이징 배포하다가 실수로 환경변수를 로그에 찍어버렸어요. AWS 키 AKIAIOSFODNN7EXAMPLE 랑 시크릿이 그대로 노출됐고, OpenAI 키도 sk-abcdefghijklmnopqrstuvwxyz1234567890 이게 커밋에 들어갔습니다. 깃헙 토큰 ghp_1234567890abcdefghijklmnopqrstuvwxyz12 도 같이요. 일단 전부 무효화(rotate) 하겠습니다. DB 접속 비번도 password=Sup3rSecret!2024 로 평문이라 바꿔야 해요. 관련 PR은 #1423, 빌드 버전은 v2.3.1 입니다. 인프라팀 박지훈 님께 공유 부탁드려요. 사내 위키 https://wiki.internal/runbook 참고하세요.",
+      "truth": [
+        {
+          "category": "AWS_SECRET",
+          "value": "AKIAIOSFODNN7EXAMPLE"
+        },
+        {
+          "category": "API_KEY",
+          "value": "sk-abcdefghijklmnopqrstuvwxyz1234567890"
+        },
+        {
+          "category": "API_KEY",
+          "value": "ghp_1234567890abcdefghijklmnopqrstuvwxyz12"
+        },
+        {
+          "category": "PASSWORD",
+          "value": "Sup3rSecret!2024"
+        },
+        {
+          "category": "PERSON",
+          "value": "박지훈"
+        }
+      ],
+      "tp": 4,
+      "fn": 1,
+      "fp": 3,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "박지훈"
+        }
+      ],
+      "extra": [
+        {
+          "category": "ORGANIZATION",
+          "value": "OpenAI"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "인프라팀"
+        },
+        {
+          "category": "HOSTNAME",
+          "value": "wiki.internal"
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "title": "병원 접수 안내 이메일",
+      "text": "안녕하세요, 환자분. 내일 진료 예약 확인차 연락드립니다. 성함 이도현, 생년월일 1988-03-12, 연락처 010-7788-9900 으로 등록되어 있습니다. 접수 시 주민번호 770123-4279267 필요합니다. 초진 문진표는 dohyun.lee@daum.net 으로 발송했으니 작성 부탁드립니다. 병원 위치는 서울 송파구 올림픽로 300 메디컬타워 5층이며, 주차 등록 차량은 12가 3456 입니다. 수납은 카드 5500-0055-5555-5559 또는 현금 가능합니다. 진료과는 정형외과, 담당의는 최민호 과장입니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "이도현"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-7788-9900"
+        },
+        {
+          "category": "RRN",
+          "value": "770123-4279267"
+        },
+        {
+          "category": "EMAIL",
+          "value": "dohyun.lee@daum.net"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 송파구 올림픽로 300"
+        },
+        {
+          "category": "CARD",
+          "value": "5500-0055-5555-5559"
+        },
+        {
+          "category": "PERSON",
+          "value": "최민호"
+        }
+      ],
+      "tp": 7,
+      "fn": 0,
+      "fp": 0,
+      "missed": [],
+      "extra": []
+    },
+    {
+      "id": "04",
+      "title": "채용 지원 서류 요약",
+      "text": "지원자 정보 정리합니다. 이름 강하늘, 휴대폰 010-2233-4455, 이메일 haneul.kang@kakao.com. 현 주소는 경기도 성남시 분당구 판교역로 235 이고, 전 직장은 네이버였습니다. 포트폴리오는 깃헙 https://github.com/haneulk 에 있고, 비상연락망으로 부친 010-9001-2002 도 받았습니다. 여권번호 M12345678 (해외 출장 이력 확인용), 운전면허 11-19-123456-01 소지. 희망 연봉은 6,500만원, 입사 가능일 7월 1일. 학력은 2015년 졸업입니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "강하늘"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-2233-4455"
+        },
+        {
+          "category": "EMAIL",
+          "value": "haneul.kang@kakao.com"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "경기도 성남시 분당구 판교역로 235"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "네이버"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-9001-2002"
+        },
+        {
+          "category": "PASSPORT",
+          "value": "M12345678"
+        },
+        {
+          "category": "DRIVER_LICENSE",
+          "value": "11-19-123456-01"
+        }
+      ],
+      "tp": 7,
+      "fn": 1,
+      "fp": 0,
+      "missed": [
+        {
+          "category": "ORGANIZATION",
+          "value": "네이버"
+        }
+      ],
+      "extra": []
+    },
+    {
+      "id": "05",
+      "title": "택배 분실 문의 (비표준 계좌 — 갭)",
+      "text": "배송 못 받아서 문의드려요. 받는 사람 윤지우, 전화 010-5566-7788 입니다. 주소는 인천 연수구 송도과학로 32 아파트 105동 1203호예요. 보상은 신한은행 계좌로 받을게요, 계좌번호는 110-123456-78901 입니다. 혹시 안 되면 다른 계좌 123-456-789012 로 부탁해요. 구매할 때 적은 이메일은 jiwoo.yoon@naver.com 이고요. 운송장 번호는 123456789012 입니다. 빠른 처리 부탁드립니다. 사업자등록번호 180-63-41205 로 세금계산서도 필요해요.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "윤지우"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-5566-7788"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "인천 연수구 송도과학로 32"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "110-123456-78901"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "123-456-789012"
+        },
+        {
+          "category": "EMAIL",
+          "value": "jiwoo.yoon@naver.com"
+        },
+        {
+          "category": "BIZ_NO",
+          "value": "180-63-41205"
+        }
+      ],
+      "tp": 7,
+      "fn": 0,
+      "fp": 2,
+      "missed": [],
+      "extra": [
+        {
+          "category": "ORGANIZATION",
+          "value": "신한은행"
+        },
+        {
+          "category": "DRIVER_LICENSE",
+          "value": "123456789012"
+        }
+      ]
+    },
+    {
+      "id": "06",
+      "title": "부동산 계약 메모",
+      "text": "매매 계약 건 정리. 매도인 한상우, 연락처 010-1212-3434. 매수인 오세훈, 010-5656-7878. 물건지는 서울 강남구 도곡로 401 타워팰리스 입니다. 매도인 주민번호 340128-1381696 확인했고, 계약금은 우리은행 1002-345-678901 로 입금 예정입니다. 중개사무소는 대박공인중개사, 사업자번호 469-80-91148. 등기 관련 서류는 sangwoo.han@gmail.com 으로 보냅니다. 계약일은 6월 25일, 잔금일은 8월 30일입니다. 매매가 18억 5천.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "한상우"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-1212-3434"
+        },
+        {
+          "category": "PERSON",
+          "value": "오세훈"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-5656-7878"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 강남구 도곡로 401"
+        },
+        {
+          "category": "RRN",
+          "value": "340128-1381696"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "1002-345-678901"
+        },
+        {
+          "category": "BIZ_NO",
+          "value": "469-80-91148"
+        },
+        {
+          "category": "EMAIL",
+          "value": "sangwoo.han@gmail.com"
+        }
+      ],
+      "tp": 8,
+      "fn": 1,
+      "fp": 2,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "한상우"
+        }
+      ],
+      "extra": [
+        {
+          "category": "ORGANIZATION",
+          "value": "우리은행"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "대박공인중개사"
+        }
+      ]
+    },
+    {
+      "id": "07",
+      "title": "외국인 직원 인사 등록",
+      "text": "신규 입사 외국인 직원 등록 건입니다. 영문명 John Smith, 한글명 존스미스, 외국인등록번호 900101-5234567 입니다. 연락처 010-4040-5050, 이메일 john.smith@company.io. 거주지는 서울 용산구 이태원로 200 입니다. 여권번호는 S98765432 이고, 급여 계좌는 하나은행 123456-78-901234 로 등록했습니다. 비자 만료일 2026-12-31. 소속은 글로벌사업팀이며 사번은 EMP-2024-0312 입니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "존스미스"
+        },
+        {
+          "category": "FOREIGN_REG",
+          "value": "900101-5234567"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-4040-5050"
+        },
+        {
+          "category": "EMAIL",
+          "value": "john.smith@company.io"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 용산구 이태원로 200"
+        },
+        {
+          "category": "PASSPORT",
+          "value": "S98765432"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "123456-78-901234"
+        }
+      ],
+      "tp": 6,
+      "fn": 1,
+      "fp": 2,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "존스미스"
+        }
+      ],
+      "extra": [
+        {
+          "category": "PERSON",
+          "value": "John Smith"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "하나은행"
+        }
+      ]
+    },
+    {
+      "id": "08",
+      "title": "회의록 (tool_result 시뮬레이션)",
+      "text": "[시스템 로그 첨부] 운영 서버 점검 결과입니다. 관리자 계정 admin 의 임시 비밀번호는 password=Adm1n!Temp2024 로 설정되어 있었고, 즉시 변경 권고합니다. 서비스 계정 키 AIzaSyA1234567890abcdefghijklmnopqrstuvw 가 코드에 하드코딩되어 있습니다. JWT 세션 토큰 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123ghiJKL 도 로그에 남아 있었습니다. 점검 담당자 신우진 책임, 내선 010-6060-7070. 다음 점검은 분기말. 영향받는 서비스는 결제 모듈 v4.1.0 입니다.",
+      "truth": [
+        {
+          "category": "PASSWORD",
+          "value": "Adm1n!Temp2024"
+        },
+        {
+          "category": "GCP_KEY",
+          "value": "AIzaSyA1234567890abcdefghijklmnopqrstuvw"
+        },
+        {
+          "category": "TOKEN",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123ghiJKL"
+        },
+        {
+          "category": "PERSON",
+          "value": "신우진"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-6060-7070"
+        }
+      ],
+      "tp": 4,
+      "fn": 1,
+      "fp": 0,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "신우진"
+        }
+      ],
+      "extra": []
+    },
+    {
+      "id": "09",
+      "title": "은행 콜센터 스크립트 (한글 비번 라벨 — 갭)",
+      "text": "고객님 본인확인 진행하겠습니다. 성함 배수지 고객님 맞으신가요? 등록된 전화 010-7070-8080 마지막 네 자리 확인됐습니다. 인터넷뱅킹 비밀번호: SecurePw99 라고 메모에 적혀 있는데 보안상 폐기하겠습니다. 주민등록번호 010809-2201058 확인 완료했고요. 자택 주소는 대전 유성구 대학로 99 입니다. 출금 계좌 신한 110-123456-78901, 이메일 suji.bae@hanmail.net. 최근 거래 내역은 앱에서 확인 가능합니다. 상담사 번호는 1588-0000 입니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "배수지"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-7070-8080"
+        },
+        {
+          "category": "PASSWORD",
+          "value": "SecurePw99"
+        },
+        {
+          "category": "RRN",
+          "value": "010809-2201058"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "대전 유성구 대학로 99"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "110-123456-78901"
+        },
+        {
+          "category": "EMAIL",
+          "value": "suji.bae@hanmail.net"
+        }
+      ],
+      "tp": 6,
+      "fn": 1,
+      "fp": 1,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "배수지"
+        }
+      ],
+      "extra": [
+        {
+          "category": "PERSON",
+          "value": "고객"
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "title": "개인 일기 (문맥형 PII)",
+      "text": "오랜만에 대학 동기 모임에 다녀왔다. 민준이랑 서윤이는 여전했고, 특히 박건우는 삼성전자 들어갔다고 자랑하더라. 나는 다음 주에 카카오 면접이 있어서 좀 긴장된다. 집에 오는 길에 강남역 근처에서 우연히 옛 직장 상사 김태형 부장님을 만났는데, 연락처 받아뒀다. 010-3030-2020. 다음에 밥 한번 먹기로 했다. 요즘 사는 동네 서초구 반포대로 58 은 조용하고 좋다. 내일은 운동 좀 해야지.",
+      "truth": [
+        {
+          "category": "ORGANIZATION",
+          "value": "삼성전자"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "카카오"
+        },
+        {
+          "category": "PERSON",
+          "value": "김태형"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-3030-2020"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서초구 반포대로 58"
+        },
+        {
+          "category": "PERSON",
+          "value": "박건우"
+        }
+      ],
+      "tp": 3,
+      "fn": 3,
+      "fp": 1,
+      "missed": [
+        {
+          "category": "ORGANIZATION",
+          "value": "카카오"
+        },
+        {
+          "category": "PERSON",
+          "value": "김태형"
+        },
+        {
+          "category": "PERSON",
+          "value": "박건우"
+        }
+      ],
+      "extra": [
+        {
+          "category": "ADDRESS",
+          "value": "강남역"
+        }
+      ]
+    },
+    {
+      "id": "11",
+      "title": "온라인 쇼핑 주문 확인",
+      "text": "주문해주셔서 감사합니다. 주문자 임채원 님, 결제 금액 89,000원 확인되었습니다. 배송지: 광주 서구 상무중앙로 7 오피스텔 808호. 연락처 010-8181-9292. 결제 카드 4111-1111-1111-1111 승인 완료. 적립 포인트는 chaewon.lim@gmail.com 계정에 쌓였습니다. 교환/반품 문의는 고객센터로 부탁드립니다. 주문번호 2024-0613-77882, 송장번호는 발송 후 안내드립니다. 멤버십 등급은 GOLD입니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "임채원"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "광주 서구 상무중앙로 7"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-8181-9292"
+        },
+        {
+          "category": "CARD",
+          "value": "4111-1111-1111-1111"
+        },
+        {
+          "category": "EMAIL",
+          "value": "chaewon.lim@gmail.com"
+        }
+      ],
+      "tp": 5,
+      "fn": 0,
+      "fp": 0,
+      "missed": [],
+      "extra": []
+    },
+    {
+      "id": "12",
+      "title": "법률 상담 요청서",
+      "text": "교통사고 손해배상 관련 상담 요청합니다. 의뢰인 성명 조은별, 주민번호 300504-4502140. 사고 일시 6월 1일, 장소는 부산 해운대구 우동 1408 사거리. 연락처 010-2727-3838, 이메일 eunbyul.jo@outlook.com. 상대 차량 운전자는 면허번호 23-45-678901-23 소지자였고, 보험사는 삼성화재입니다. 합의금 입금 계좌는 농협 1002-345-678901. 관련 진단서와 사고 사진은 별도 첨부합니다. 사건번호는 추후 부여 예정.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "조은별"
+        },
+        {
+          "category": "RRN",
+          "value": "300504-4502140"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "부산 해운대구 우동 1408"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-2727-3838"
+        },
+        {
+          "category": "EMAIL",
+          "value": "eunbyul.jo@outlook.com"
+        },
+        {
+          "category": "DRIVER_LICENSE",
+          "value": "23-45-678901-23"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "삼성화재"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "1002-345-678901"
+        }
+      ],
+      "tp": 8,
+      "fn": 0,
+      "fp": 0,
+      "missed": [],
+      "extra": []
+    },
+    {
+      "id": "13",
+      "title": "DevOps 인시던트 리포트",
+      "text": "장애 보고: 02시 14분 결제 API 오류 급증. 원인은 만료된 인증서와 유출된 자격증명입니다. 유출된 프라이빗 키 일부: -----BEGIN RSA PRIVATE KEY----- MIIBOgIBAAJBAKj34GkxFh -----END RSA PRIVATE KEY----- 그리고 슬랙 웹훅에 박힌 토큰 ghp_abcdEFGH1234567890ijklMNOP1234567890qZ 발견. 대응 담당 한지민, 비상 연락 010-9999-8888. 영향받은 고객 약 1,200명. 롤백 버전은 release-2024.06.13. 사후 분석 회의는 내일 10시입니다.",
+      "truth": [
+        {
+          "category": "PRIVATE_KEY",
+          "value": "-----BEGIN RSA PRIVATE KEY-----"
+        },
+        {
+          "category": "API_KEY",
+          "value": "ghp_abcdEFGH1234567890ijklMNOP1234567890qZ"
+        },
+        {
+          "category": "PERSON",
+          "value": "한지민"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-9999-8888"
+        }
+      ],
+      "tp": 4,
+      "fn": 0,
+      "fp": 0,
+      "missed": [],
+      "extra": []
+    },
+    {
+      "id": "14",
+      "title": "학원 등록 상담",
+      "text": "자녀 수학 단과 등록 문의 주셔서 감사합니다. 학생 이름 최서진, 학부모 성함 최영수. 학부모 연락처 010-4545-6767, 비상연락 010-7654-3210. 집 주소는 대구 수성구 동대구로 23 입니다. 등록비는 카드 5500-0055-5555-5559 로 결제 가능하고, 계좌이체는 국민 123456-78-901234 도 됩니다. 안내 메일은 youngsoo.choi@gmail.com 으로 보내드릴게요. 셔틀버스 노선은 A코스입니다. 개강은 7월 첫째 주.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "최서진"
+        },
+        {
+          "category": "PERSON",
+          "value": "최영수"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-4545-6767"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-7654-3210"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "대구 수성구 동대구로 23"
+        },
+        {
+          "category": "CARD",
+          "value": "5500-0055-5555-5559"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "123456-78-901234"
+        },
+        {
+          "category": "EMAIL",
+          "value": "youngsoo.choi@gmail.com"
+        }
+      ],
+      "tp": 8,
+      "fn": 0,
+      "fp": 0,
+      "missed": [],
+      "extra": []
+    },
+    {
+      "id": "15",
+      "title": "환자 차트 인계 노트",
+      "text": "야간 인계합니다. 301호 환자 권나라, 760312-2345671 진통제 투여 후 안정. 보호자 연락처 010-1313-2424. 302호 환자 정우성, 주소 서울 종로구 종로 1 거주, 내일 오전 퇴원 예정입니다. 약 처방전은 nara.kwon@medi.kr 로 발송 요청 들어왔어요. 303호는 금식 유지. 응급 연락은 당직의 010-5151-6262. 병동 비밀번호는 분기마다 변경됩니다. 다음 라운딩은 6시입니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "권나라"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-1313-2424"
+        },
+        {
+          "category": "PERSON",
+          "value": "정우성"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 종로구 종로 1"
+        },
+        {
+          "category": "EMAIL",
+          "value": "nara.kwon@medi.kr"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-5151-6262"
+        },
+        {
+          "category": "RRN",
+          "value": "760312-2345671"
+        }
+      ],
+      "tp": 6,
+      "fn": 1,
+      "fp": 0,
+      "missed": [
+        {
+          "category": "RRN",
+          "value": "760312-2345671"
+        }
+      ],
+      "extra": []
+    },
+    {
+      "id": "16",
+      "title": "프리랜서 계약/정산",
+      "text": "6월 외주 정산 안내드립니다. 작업자 성함 남도일, 사업자등록번호 010-24-69680 (간이과세). 정산 금액 330만원, 입금 계좌는 카카오뱅크 3333-01-1234567 입니다. 세금계산서 발행 위해 이메일 doil.nam@gmail.com 확인 부탁드려요. 연락처 010-3636-4747. 계약서상 주소는 서울 영등포구 여의대로 24. 다음 프로젝트는 8월 시작 예정이며, NDA 서명본은 별도 보관합니다. 인보이스 번호 INV-0613.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "남도일"
+        },
+        {
+          "category": "BIZ_NO",
+          "value": "010-24-69680"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "3333-01-1234567"
+        },
+        {
+          "category": "EMAIL",
+          "value": "doil.nam@gmail.com"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-3636-4747"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 영등포구 여의대로 24"
+        }
+      ],
+      "tp": 6,
+      "fn": 0,
+      "fp": 1,
+      "missed": [],
+      "extra": [
+        {
+          "category": "ORGANIZATION",
+          "value": "카카오뱅크"
+        }
+      ]
+    },
+    {
+      "id": "17",
+      "title": "보험 가입 설계",
+      "text": "종신보험 설계 내역입니다. 피보험자 황민영, 주민번호 310124-2427977. 월 납입액 12만원, 가입자 연락처 010-8282-9393, 이메일 minyoung.hwang@nate.com. 자동이체 계좌 우리 1002-345-678901 등록 예정. 주소는 울산 남구 삼산로 100. 수익자는 배우자 황지훈으로 지정. 청약 카드 4111-1111-1111-1111 로 첫 회 결제. 보장 개시일은 익월 1일입니다. 증권번호는 발급 후 안내드립니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "황민영"
+        },
+        {
+          "category": "RRN",
+          "value": "310124-2427977"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-8282-9393"
+        },
+        {
+          "category": "EMAIL",
+          "value": "minyoung.hwang@nate.com"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "1002-345-678901"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "울산 남구 삼산로 100"
+        },
+        {
+          "category": "PERSON",
+          "value": "황지훈"
+        },
+        {
+          "category": "CARD",
+          "value": "4111-1111-1111-1111"
+        }
+      ],
+      "tp": 7,
+      "fn": 1,
+      "fp": 0,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "황지훈"
+        }
+      ],
+      "extra": []
+    },
+    {
+      "id": "18",
+      "title": "코드 리뷰 코멘트 (코드+PII 혼합)",
+      "text": "리뷰 남깁니다. config.py 에 테스트용 자격증명이 그대로 있네요. API_KEY = 'sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV' 이건 .env 로 빼주세요. 그리고 send_email(to='customer.report@bizmail.com') 호출에서 실제 고객 메일이 하드코딩됐어요. 주석에 '담당: 류현진 010-1010-2020' 도 지워주시고요. DB_PASSWORD=devpass2024! 도 위험합니다. 함수명 get_user_rrn() 는 괜찮은데 리턴값 로깅은 빼주세요. 변수 order_id=ORD-2024-0613 는 유지. 전반적으로 LGTM, 위 5개만 수정 부탁해요.",
+      "truth": [
+        {
+          "category": "API_KEY",
+          "value": "sk-test1234567890ABCDEFGHIJKLMNOPQRSTUV"
+        },
+        {
+          "category": "EMAIL",
+          "value": "customer.report@bizmail.com"
+        },
+        {
+          "category": "PERSON",
+          "value": "류현진"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-1010-2020"
+        },
+        {
+          "category": "PASSWORD",
+          "value": "devpass2024!"
+        }
+      ],
+      "tp": 4,
+      "fn": 1,
+      "fp": 0,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "류현진"
+        }
+      ],
+      "extra": []
+    },
+    {
+      "id": "19",
+      "title": "동호회 회원 명부",
+      "text": "테니스 동호회 신규 회원 명단 공유합니다. 1. 서지호 010-1122-3344 서울 노원구 동일로 1414. 2. 문가영 010-5566-1122 경기 고양시 일산동구 중앙로 1275. 3. 백승호 010-9988-7766. 회비 입금은 회장 계좌 신한 110-123456-78901 로 부탁드립니다. 단체 카톡방 초대는 가입 신청서의 이메일 주소로 보냅니다. 서지호 님은 jiho.seo@gmail.com 이고요. 다음 정기 모임은 6월 22일 오전 9시, 양재 시민의 숲 코트입니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "서지호"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-1122-3344"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 노원구 동일로 1414"
+        },
+        {
+          "category": "PERSON",
+          "value": "백승호"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-9988-7766"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "110-123456-78901"
+        },
+        {
+          "category": "EMAIL",
+          "value": "jiho.seo@gmail.com"
+        },
+        {
+          "category": "PERSON",
+          "value": "문가영"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-5566-1122"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "경기 고양시 일산동구 중앙로 1275"
+        }
+      ],
+      "tp": 6,
+      "fn": 4,
+      "fp": 2,
+      "missed": [
+        {
+          "category": "KR_ACCOUNT",
+          "value": "110-123456-78901"
+        },
+        {
+          "category": "PERSON",
+          "value": "문가영"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-5566-1122"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "경기 고양시 일산동구 중앙로 1275"
+        }
+      ],
+      "extra": [
+        {
+          "category": "ADDRESS",
+          "value": "신한 110-123456-78901"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "양재"
+        }
+      ]
+    },
+    {
+      "id": "20",
+      "title": "수출 통관 서류",
+      "text": "수출 신고 건 정리합니다. 수출자 상호 한빛무역, 사업자등록번호 887-13-78905. 담당자 오지환, 연락처 010-3434-5656, 이메일 jihwan.oh@hanbit.co.kr. 수입자는 미국 바이어 Mike Brown. 선적 항구는 부산항. 결제 조건 T/T, 대금 수취 계좌 외환 123456-78-901234. 컨테이너 번호 ABCU-1234567. 인보이스 금액 USD 52,000. HS 코드는 8517.12 입니다. 통관 예정일 6월 18일.",
+      "truth": [
+        {
+          "category": "ORGANIZATION",
+          "value": "한빛무역"
+        },
+        {
+          "category": "BIZ_NO",
+          "value": "887-13-78905"
+        },
+        {
+          "category": "PERSON",
+          "value": "오지환"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-3434-5656"
+        },
+        {
+          "category": "EMAIL",
+          "value": "jihwan.oh@hanbit.co.kr"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "123456-78-901234"
+        }
+      ],
+      "tp": 6,
+      "fn": 0,
+      "fp": 2,
+      "missed": [],
+      "extra": [
+        {
+          "category": "PERSON",
+          "value": "Mike Brown"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "부산항"
+        }
+      ]
+    },
+    {
+      "id": "21",
+      "title": "민원 접수 (관공서)",
+      "text": "도로 보수 민원 접수합니다. 민원인 강도영, 연락처 010-6767-8989. 주소는 세종특별자치시 한누리대로 2130 입니다. 주민번호 920723-1641620 으로 본인인증 완료. 민원 회신은 문자 또는 이메일 doyoung.kang@korea.kr 로 받기 원하십니다. 현장은 아파트 정문 앞 도로 파임. 사진 3장 첨부. 접수번호 2024-MIN-00913. 처리 기한은 14일 이내입니다. 담당 부서는 도로과.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "강도영"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-6767-8989"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "세종특별자치시 한누리대로 2130"
+        },
+        {
+          "category": "RRN",
+          "value": "920723-1641620"
+        },
+        {
+          "category": "EMAIL",
+          "value": "doyoung.kang@korea.kr"
+        }
+      ],
+      "tp": 5,
+      "fn": 0,
+      "fp": 1,
+      "missed": [],
+      "extra": [
+        {
+          "category": "ADDRESS",
+          "value": "아파트 정문 앞"
+        }
+      ]
+    },
+    {
+      "id": "22",
+      "title": "스타트업 투자 메모 (혼합 영문)",
+      "text": "시드 라운드 검토 노트입니다. 대표 Kevin Park(박준혁), 연락처 010-2020-3030. 회사는 클라우드비전, 사업자번호 469-80-91148. pitch deck는 kevin@cloudvision.io 로 받았습니다. 은행 계좌(에스크로) 하나 1002-345-678901. 법인 주소 서울 강남구 테헤란로 521. 기술 데모 서버 접속 토큰 AKIAIOSFODNN7EXAMPLE 이 메일에 그대로 와서 보안 지적했습니다. 밸류에이션 80억, 지분 12% 협의 중. 다음 미팅 6월 19일.",
+      "truth": [
+        {
+          "category": "PHONE",
+          "value": "010-2020-3030"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "클라우드비전"
+        },
+        {
+          "category": "BIZ_NO",
+          "value": "469-80-91148"
+        },
+        {
+          "category": "EMAIL",
+          "value": "kevin@cloudvision.io"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "1002-345-678901"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 강남구 테헤란로 521"
+        },
+        {
+          "category": "AWS_SECRET",
+          "value": "AKIAIOSFODNN7EXAMPLE"
+        },
+        {
+          "category": "PERSON",
+          "value": "박준혁"
+        }
+      ],
+      "tp": 7,
+      "fn": 1,
+      "fp": 1,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "박준혁"
+        }
+      ],
+      "extra": [
+        {
+          "category": "PERSON",
+          "value": "Kevin Park"
+        }
+      ]
+    },
+    {
+      "id": "23",
+      "title": "졸업생 추천서",
+      "text": "추천서를 작성합니다. 학생 윤하린은 2024년 우리 학과를 졸업한 우수한 인재입니다. 현재 연락처는 010-7878-9090, 이메일 harin.yoon@univ.ac.kr 입니다. 재학 중 LG전자 인턴십을 성실히 수행했고, 거주지는 서울 관악구 관악로 1 입니다. 추천인 본인은 컴퓨터공학과 정교수 한석규이며, 연구실 내선으로 문의 가능합니다. 학점은 4.2/4.5, 졸업 작품은 수상 이력이 있습니다. 추가 문의 환영합니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "윤하린"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-7878-9090"
+        },
+        {
+          "category": "EMAIL",
+          "value": "harin.yoon@univ.ac.kr"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "LG전자"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 관악구 관악로 1"
+        },
+        {
+          "category": "PERSON",
+          "value": "한석규"
+        }
+      ],
+      "tp": 3,
+      "fn": 3,
+      "fp": 0,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "윤하린"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "LG전자"
+        },
+        {
+          "category": "PERSON",
+          "value": "한석규"
+        }
+      ],
+      "extra": []
+    },
+    {
+      "id": "24",
+      "title": "중고거래 채팅",
+      "text": "안녕하세요 아이폰 판매글 보고 연락드려요. 직거래 가능하실까요? 저는 신도림역 근처 살아요. 혹시 안 되면 택배도 괜찮아요. 받는 주소 알려드릴게요. 서울 구로구 경인로 662, 받는사람 임수호, 연락처 010-4321-8765 입니다. 입금은 카카오뱅크 3333-02-7654321 로 할게요. 이메일은 sooho.lim@gmail.com. 혹시 영수증 필요하면 말씀해주세요. 네고는 살짝만 부탁드려요. 물건 상태 좋아 보이네요. 내일 오후에 거래 가능합니다.",
+      "truth": [
+        {
+          "category": "ADDRESS",
+          "value": "서울 구로구 경인로 662"
+        },
+        {
+          "category": "PERSON",
+          "value": "임수호"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-4321-8765"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "3333-02-7654321"
+        },
+        {
+          "category": "EMAIL",
+          "value": "sooho.lim@gmail.com"
+        }
+      ],
+      "tp": 5,
+      "fn": 0,
+      "fp": 2,
+      "missed": [],
+      "extra": [
+        {
+          "category": "ADDRESS",
+          "value": "신도림역"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "카카오뱅크"
+        }
+      ]
+    },
+    {
+      "id": "25",
+      "title": "급여 명세 발송",
+      "text": "6월 급여명세서 발송합니다. 직원 성명 조민서, 사번 EMP-0312. 실수령액 320만원. 급여 이체 계좌는 국민 123456-78-901234 입니다. 4대보험 정산 위해 주민번호 770123-4279267 확인했습니다. 명세서 PDF는 minseo.cho@corp.com 으로 발송. 문의는 인사팀 010-1357-2468. 주소지 변경 있으시면 알려주세요, 현재 등록은 경기 수원시 영통구 광교중앙로 145. 연말정산 자료는 12월에 별도 안내드립니다.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "조민서"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "123456-78-901234"
+        },
+        {
+          "category": "RRN",
+          "value": "770123-4279267"
+        },
+        {
+          "category": "EMAIL",
+          "value": "minseo.cho@corp.com"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-1357-2468"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "경기 수원시 영통구 광교중앙로 145"
+        }
+      ],
+      "tp": 6,
+      "fn": 0,
+      "fp": 0,
+      "missed": [],
+      "extra": []
+    },
+    {
+      "id": "26",
+      "title": "여행 예약 확정",
+      "text": "제주 여행 예약 확정 안내드립니다. 대표 예약자 손흥민, 동반 1인. 연락처 010-7000-8000. 항공권 발권 위해 여권번호 M12345678 등록 완료. 숙소는 제주 서귀포시 중문관광로 72 호텔. 체크인 6월 20일. 결제 카드 4111-1111-1111-1111 승인. 예약 확인 메일은 heungmin.son@gmail.com 으로 발송했습니다. 렌터카는 H사 SUV, 보험 포함. 예약번호 JEJU-240613-22. 즐거운 여행 되세요!",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "손흥민"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-7000-8000"
+        },
+        {
+          "category": "PASSPORT",
+          "value": "M12345678"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "제주 서귀포시 중문관광로 72"
+        },
+        {
+          "category": "CARD",
+          "value": "4111-1111-1111-1111"
+        },
+        {
+          "category": "EMAIL",
+          "value": "heungmin.son@gmail.com"
+        }
+      ],
+      "tp": 6,
+      "fn": 0,
+      "fp": 0,
+      "missed": [],
+      "extra": []
+    },
+    {
+      "id": "27",
+      "title": "전세 대출 상담 (민감 집약)",
+      "text": "전세자금대출 상담 기록입니다. 신청인 김연아, 주민등록번호 760312-2345671. 재직 회사 현대자동차, 연소득 6천만원. 연락처 010-2468-1357, 이메일 yuna.kim@hmail.com. 임차 주소 서울 송파구 백제고분로 50. 기존 거래 계좌 신한 110-123456-78901. 결혼 예정으로 배우자 이상화도 공동 명의 검토. 대출 한도는 심사 후 안내. 운전면허 11-19-123456-01 사본 제출 완료. 상담사 박명수, 사번 0913.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "김연아"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "현대자동차"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-2468-1357"
+        },
+        {
+          "category": "EMAIL",
+          "value": "yuna.kim@hmail.com"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 송파구 백제고분로 50"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "110-123456-78901"
+        },
+        {
+          "category": "PERSON",
+          "value": "이상화"
+        },
+        {
+          "category": "DRIVER_LICENSE",
+          "value": "11-19-123456-01"
+        },
+        {
+          "category": "PERSON",
+          "value": "박명수"
+        },
+        {
+          "category": "RRN",
+          "value": "760312-2345671"
+        }
+      ],
+      "tp": 7,
+      "fn": 3,
+      "fp": 1,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "이상화"
+        },
+        {
+          "category": "PERSON",
+          "value": "박명수"
+        },
+        {
+          "category": "RRN",
+          "value": "760312-2345671"
+        }
+      ],
+      "extra": [
+        {
+          "category": "ORGANIZATION",
+          "value": "박명수"
+        }
+      ]
+    },
+    {
+      "id": "28",
+      "title": "AI 챗봇 대화 로그 (은연중 유출)",
+      "text": "사용자: 내 정보로 자기소개서 좀 다듬어줘. 이름은 한예슬이고 1995년생, 이메일 yeseul.han@gmail.com 으로 연락 와. 사는 곳은 서울 동작구 사당로 300 이고 전화는 010-1199-2288 이야. 전 직장은 SK하이닉스였어. 아 그리고 회사 노트북 비번이 password=Hanyeseul2024! 인데 이것도 어디 적어두면 편할까? 다음 주 면접 회사는 쿠팡이야. 긴장된다. 경력 5년차로 정리해줘. 고마워!",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "한예슬"
+        },
+        {
+          "category": "EMAIL",
+          "value": "yeseul.han@gmail.com"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 동작구 사당로 300"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-1199-2288"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "SK하이닉스"
+        },
+        {
+          "category": "PASSWORD",
+          "value": "Hanyeseul2024!"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "쿠팡"
+        }
+      ],
+      "tp": 5,
+      "fn": 2,
+      "fp": 0,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "한예슬"
+        },
+        {
+          "category": "ORGANIZATION",
+          "value": "쿠팡"
+        }
+      ],
+      "extra": []
+    },
+    {
+      "id": "29",
+      "title": "비표준 포맷 집중 (약점 노출)",
+      "text": "정보 정리: 담당자 노홍철(연락 010.3535.7979 — 점으로 구분). 백업 연락처는 02-555-1234 유선. 계좌는 우리 123-456-789012 (자주 쓰는 거). 사업자번호 1806341205 (하이픈 없이). 이메일 두 개: nono [at] example.com 과 real.email@example.com. 비밀번호는 그냥 '가나다1234!' 로 해놨어. 주소는 서울특별시 중구 세종대로 110. 카드 뒷자리만: 1111. 끝.",
+      "truth": [
+        {
+          "category": "PERSON",
+          "value": "노홍철"
+        },
+        {
+          "category": "PHONE",
+          "value": "010.3535.7979"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "123-456-789012"
+        },
+        {
+          "category": "BIZ_NO",
+          "value": "1806341205"
+        },
+        {
+          "category": "EMAIL",
+          "value": "real.email@example.com"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울특별시 중구 세종대로 110"
+        }
+      ],
+      "tp": 6,
+      "fn": 0,
+      "fp": 1,
+      "missed": [],
+      "extra": [
+        {
+          "category": "PHONE",
+          "value": "02-555-1234"
+        }
+      ]
+    },
+    {
+      "id": "30",
+      "title": "복합 업무 메일 (총정리)",
+      "text": "팀 공유: 신규 고객 온보딩 정보입니다. 회사 토스페이먼츠, 사업자 469-80-91148. 키맨 정해인 이사, 010-8421-7421, haein.jung@toss.im. 계약 보증금은 기업은행 123456-78-901234 로 수령. 기술 연동용 임시 API 키 sk-live9876543210ZYXWVUTSRQPONMLKJIH 를 발급했으니 운영 전 폐기하세요. 담당 개발 손나은, 주민번호 010809-2201058 은 보안서약서용으로만 받았습니다. 사무실 주소 서울 강남구 강남대로 382. 본 메일은 대외비입니다. 회신 바랍니다.",
+      "truth": [
+        {
+          "category": "ORGANIZATION",
+          "value": "토스페이먼츠"
+        },
+        {
+          "category": "BIZ_NO",
+          "value": "469-80-91148"
+        },
+        {
+          "category": "PERSON",
+          "value": "정해인"
+        },
+        {
+          "category": "PHONE",
+          "value": "010-8421-7421"
+        },
+        {
+          "category": "EMAIL",
+          "value": "haein.jung@toss.im"
+        },
+        {
+          "category": "KR_ACCOUNT",
+          "value": "123456-78-901234"
+        },
+        {
+          "category": "API_KEY",
+          "value": "sk-live9876543210ZYXWVUTSRQPONMLKJIH"
+        },
+        {
+          "category": "PERSON",
+          "value": "손나은"
+        },
+        {
+          "category": "RRN",
+          "value": "010809-2201058"
+        },
+        {
+          "category": "ADDRESS",
+          "value": "서울 강남구 강남대로 382"
+        }
+      ],
+      "tp": 8,
+      "fn": 2,
+      "fp": 1,
+      "missed": [
+        {
+          "category": "PERSON",
+          "value": "정해인"
+        },
+        {
+          "category": "PERSON",
+          "value": "손나은"
+        }
+      ],
+      "extra": [
+        {
+          "category": "ORGANIZATION",
+          "value": "팀"
+        }
+      ]
+    }
+  ]
+}

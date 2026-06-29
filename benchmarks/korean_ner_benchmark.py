@@ -343,9 +343,10 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--ner-backend",
-        choices=("spacy", "gliner"),
+        choices=("spacy", "gliner", "nunerzero"),
         default="spacy",
-        help="Stage-2 NER backend to benchmark (default: spacy)",
+        help="Stage-2 NER backend to benchmark: spacy | gliner | nunerzero "
+             "(nunerzero = NuNER Zero candidate, R21/ADR-14). Default: spacy",
     )
     parser.add_argument(
         "--quiet",
@@ -437,11 +438,16 @@ def run_benchmark(
 
     if not no_ner:
         try:
-            # R18: select the NER backend engine (spacy default / gliner).
+            # R18/R21: select the NER backend engine
+            # (spacy default / gliner / nunerzero candidate).
             if ner_backend == "gliner":
                 from pii_guard.stage2.gliner_ner import GLiNERNEREngine
-                _log("Loading GLiNERNEREngine (GLiNER Korean model) ...", quiet)
+                _log("Loading GLiNERNEREngine (GLiNER multilingual PII model) ...", quiet)
                 ner_engine = GLiNERNEREngine(min_confidence=min_confidence)
+            elif ner_backend == "nunerzero":
+                from pii_guard.stage2.nunerzero_ner import NuNERZeroNEREngine
+                _log("Loading NuNERZeroNEREngine (NuNER Zero, R21/ADR-14 candidate) ...", quiet)
+                ner_engine = NuNERZeroNEREngine(min_confidence=min_confidence)
             else:
                 from pii_guard.stage2.korean_ner import KoreanNEREngine
                 _log("Loading KoreanNEREngine (Presidio + spaCy ko) ...", quiet)
@@ -456,7 +462,7 @@ def run_benchmark(
                 f"  WARNING: NER engine not available — running Stage-1 only.\n"
                 f"  Reason: {ner_load_error}\n"
                 f"  To enable NER: install the backend ([ner] for spacy, "
-                f"[ner-gliner] for gliner) and let the model download.",
+                f"[ner-gliner] for gliner AND nunerzero) and let the model download.",
                 quiet,
             )
         except ImportError as exc:

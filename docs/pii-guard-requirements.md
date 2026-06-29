@@ -280,11 +280,12 @@ ouroboros 본체(Python 3.14)와 별도로 **Stage2(GLiNER+PyTorch 또는 Presid
   | :-- | :-- | :-- | :-- |
   | **`gliner` (기본)** | GLiNER 모델 — 기본 **`urchade/gliner_multi_pii-v1`**(Apache-2.0, 상업 가능). 라벨 프롬프트(`사람`·`주소`·`조직`)로 제로샷 추출 후 카테고리 매핑 | `stage2/gliner_ner.py` | 트랜스포머 기반 → **재현율+정밀도 우위**. PyTorch 의존(더 무거움). 옵션 설치 `[ner-gliner]`. 비상업 시 `taeminlee/gliner_ko`(CC-BY-NC) 선택 가능 |
   | **`spacy` (경량 폴백)** | Microsoft Presidio + spaCy `ko_core_news_lg`(폴백 `sm`). spaCy 라벨(PS/LC/OG)→엔티티 매핑 | `stage2/korean_ner.py` | 가벼움·빠름 → **메모리 제약(8GB 빠듯) 환경**용. 옵션 설치 `[ner]` |
+  | **`nunerzero` (평가 후보, R21)** | NuNER Zero (`numind/NuNER_Zero`, **MIT·상업 가능**). GLiNER와 동계열 제로샷이나 **토큰 분류** 구조 → 긴/복합 엔티티(주소·조직명)에 유리, 라벨 프롬프트로 추출 후 카테고리 매핑 | `stage2/nunerzero_ner.py` *(신설 예정)* | 트랜스포머 기반. GLiNER Large v2.1 대비 약 +3% 보고(외부). **벤치 비교 후 채택 게이트 통과 시에만 정식 옵션 승격**(R21). 다국어(한국어 포함 추정) |
 
 - **백엔드 선택 방법 (둘 다 지원)**:
-  1. **환경변수** `PIIGUARD_NER_BACKEND=gliner|spacy` (미설정 시 기본 `gliner`).
+  1. **환경변수** `PIIGUARD_NER_BACKEND=gliner|spacy` (미설정 시 기본 `gliner`; R21 평가 단계에서 `nunerzero` 추가).
   2. **정책 YAML** `stage2.ner_backend: gliner|spacy` (핫리로드). env가 있으면 env 우선.
-  3. 각 백엔드의 **모델 변형**도 오버라이드 가능 — GLiNER는 `PIIGUARD_GLINER_MODEL`, spaCy는 기존 `PIIGUARD_KO_SPACY_MODEL`.
+  3. 각 백엔드의 **모델 변형**도 오버라이드 가능 — GLiNER는 `PIIGUARD_GLINER_MODEL`, spaCy는 기존 `PIIGUARD_KO_SPACY_MODEL`, NuNER Zero는 `PIIGUARD_NUNERZERO_MODEL`(R21).
   - 추상화: `resolve_ner_backend()`가 백엔드를 결정하고, 백엔드별 리졸버가 모델을 고른다. 자세한 근거는 [`DESIGN.md`](./DESIGN.md) ADR-9·ADR-10·**ADR-11**.
 - **블록당 하드 타임아웃**(기본 ~500ms~1s): 모델이 멈추거나 너무 느리면 무한 대기하지 않고 **끊고 `stage2_fail_action`으로 처리**(§14 열화). → 가용성 보장. (백엔드 무관 동일)
 - **격리**: 무거운 모델은 **별도 워커 프로세스**(spawn)에서 돈다 → Stage2가 죽어도(OOM 등) 코어는 생존(§3.1). GLiNER가 더 무겁기 때문에 이 격리는 GLiNER 기본 채택의 전제다.
@@ -543,7 +544,7 @@ budgets: { memory_budget_mb: 1500, stage2_timeout_ms: 800, model_idle_evict_seco
 - 티어2 egress 락다운(pf, root) + break-glass
 - hwp/hwpx·OCR(이미지 PII)
 - `proxy_held` 자격증명 모드, `tokenize_roundtrip` 시크릿 편집
-- GLiNER 백엔드(R18, ✅ 완료) → **NER 정확도 추가 향상(R20)**: 신뢰도 임계값 노브 정책 노출 + GLiNER 파인튜닝(ORG 정밀도·잔여 recall) → 추가로 transformer 한국어 NER(KoELECTRA/KLUE) 옵션, 서명된 자동 룰 갱신 채널
+- GLiNER 백엔드(R18, ✅ 완료) → **NER 정확도 추가 향상(R20)**: 신뢰도 임계값 노브 정책 노출 + GLiNER 파인튜닝(ORG 정밀도·잔여 recall) → **NuNER Zero 백엔드 후보 벤치 비교·채택 평가(R21)** → 추가로 transformer 한국어 NER(KoELECTRA/KLUE) 옵션, 서명된 자동 룰 갱신 채널
 - 브라우저/스크립트 채널 확장, (잠재 티어3) VM/샌드박스 봉쇄
 
 ---
@@ -646,6 +647,7 @@ acceptance_criteria:
 | **R18** | **선택형 Stage2 NER 백엔드** (✅ 구현·실측 완료 — `stage2/backend.py`·`stage2/gliner_ner.py`·`_workers.py`·`policy.py`·`Engine`·`serve`·워밍업; 단위테스트 `tests/test_ner_backend.py`; GLiNER 실측 = `validation/NER_BACKEND_COMPARISON.md`): Stage2 NER 엔진을 **GLiNER(기본 `urchade/gliner_multi_pii-v1`, Apache-2.0)와 spaCy(경량 폴백) 중 선택**할 수 있어야 한다. 선택은 **환경변수 `PIIGUARD_NER_BACKEND`**와 **정책 YAML `stage2.ner_backend`**(env 우선)로 노출하고, 모델 변형은 `PIIGUARD_GLINER_MODEL`/`PIIGUARD_KO_SPACY_MODEL`로 오버라이드. 두 백엔드는 **동일 카테고리(PERSON/ADDRESS/ORGANIZATION)로 정규화**되어 정책·마스킹·proximity 후필터·열화 경로가 백엔드와 무관하게 동작해야 한다. GLiNER는 트랜스포머라 **별도 워커·옵션 설치(`[ner-gliner]`)로 격리**(§3.1·§6.2). | spaCy(lg) PERSON recall 0.84(작은 모델 한계, §23.3)를 더 높은 재현율의 GLiNER로 끌어올리는 업그레이드 경로를, 메모리 제약 환경을 위한 경량 폴백을 유지한 채 **선택지로 제도화**. DR-1(§23.4)이 명시한 "로컬 인코더 NER 모델 교체" 경로의 1차 실현. 상세 = DESIGN ADR-11. |
 | **R19** | **Stage1 정형 PII recall 보강** (✅ 구현·실측 완료 — `categories.py`·`proximity.py`): 정규식/proximity로 잡는 정형 PII의 비표준 변형을 결정적으로 보강한다. ① KR_ACCOUNT 비표준 계좌 포맷 일반화(하이픈 2~3개+자릿수 9~14, 트리거 게이팅 유지) ② PASSPORT 조사 인접 경계 버그 수정(`(?!\w)`→`(?![A-Za-z0-9])`) ③ JWT 2번째 세그먼트 `eyJ` 강제 제거 ④ GitHub `ghp_` 길이 `{36,}`→`{20,}` ⑤ PASSWORD 접두 라벨(`DB_PASS=`·`temporary_pass:`) 인식. **정밀도 회귀 없이** 재현율 상승(외부 codex 0.798→0.921·gemini 0.875→0.958, 정형 PII 미검출 27→10). | FN 분류 결과 GLiNER 미검출의 ~79%가 NER이 아니라 **정형 PII(Stage1 영역)** — NER 백엔드 무관. 상세 = `validation/STAGE1_RECALL_IMPROVEMENT_2026-06-25.md`·`NER_BACKEND_COMPARISON.md §5`. |
 | **R20** | **NER 정확도 추가 향상 — 임계값 노브 + GLiNER 파인튜닝** (🔬 조사 완료, 구현 검토 대상): R19로 정형 PII를 회수한 뒤 남는 NER 갭(PERSON/ADDRESS recall, **ORG 정밀도**)을 두 레버로 개선. ① **신뢰도 임계값 노브**(`min_confidence`, 정책 노출) — GLiNER 0.50→0.35로 ADDRESS recall 0.88→1.00·PERSON 0.956→0.978, **FP 거의 불변**(무료에 가까운 Pareto 개선). ② **GLiNER 파인튜닝** — 임계값에 무반응인 **ORG 과추출(정밀도 0.774·FP 7)**을 hard-negative 학습으로 교정 → 임계값과 달리 **recall·정밀도 동시 개선(곡선 자체 상승)**. Apache 베이스라 파인튜닝 산출물도 상업 사용 가능. **파인튜닝 라이프사이클은 런타임 무변경(기존 모델 슬롯 `PIIGUARD_GLINER_MODEL`로 소비) + 오프박스 `training/` 서브시스템**(보유 라벨 데이터를 1급 입력으로 적재→학습→eval 게이트). | 임계값 스윕 실측(코퍼스): 0.5→0.3에서 PERSON/ADDRESS recall↑·FP 불변, **ORG는 임계값 무반응**(P 0.774 고정) → ORG는 파인튜닝 영역. **데이터 규모(2단계)**: 좁은 목표(ORG hard-negative) 수백~2,000 / **광역 도메인 적응(보유 수천~수만)** → PERSON·ADDRESS·ORG recall·정밀도 동시 대폭 향상(합성-only 한계 해소). **거버넌스(필수)**: 학습셋↔평가셋(코퍼스 seed=42·외부 6리포트) 분리로 누설 방지, 채택 게이트(`thresholds_met`+회귀 0), 실 PII 학습 데이터는 오프박스·레포 미커밋·암호화(P4)·모델 암기 점검. 권고 순서 = 임계값(즉시·무료) → 잔차 측정 → 파인튜닝. 상세 = DESIGN **ADR-12·ADR-13**·`NER_BACKEND_COMPARISON.md §5`. |
+| **R21** | **NuNER Zero 백엔드 후보 평가 — 동급 인코더 NER 벤치 비교** (✅ 구현·코퍼스 실측 완료 → **게이트 FAIL, GLiNER 기본 유지**): GLiNER와 유사 성능을 내는 동계열 제로샷 인코더 NER **NuNER Zero**(`numind/NuNER_Zero`, **MIT·상업 가능**)를 **세 번째 선택형 백엔드 후보**로 배선하고, GLiNER·spaCy와 **동일 평가셋으로 정량 비교**한 뒤 **채택 게이트 통과 시에만 정식 옵션으로 승격**한다. **실측 결과: 코퍼스+외부 6리포트 양쪽 게이트 FAIL.** ① 코퍼스(seed=42·spf=10·임계값 0.50/0.35): PERSON·ORG 재현율 회귀(0.35: PERSON 1.00→0.92·ORG 0.98→0.90), macro-F1 GLiNER 우위(0.961 vs 0.943). ② 외부 6리포트(GLiNER 리포트에서 50케이스 텍스트·정답 복원, 동일 하니스 재채점 — **GLiNER 재채점치 원본과 정확히 일치해 검증됨**): NuNER Zero가 현실형 데이터에서 **PERSON 재현율 붕괴**(codex/gemini 1.00/0.80→0.20/0.20), 종합 재현율 전 데이터셋 열세(0.863/0.899/0.819 vs 0.966/0.989/0.931). 단 **ADDRESS 우위·ORG 정밀도 개선(0.875→0.90)** 확인 → ORG hard-negative 관점 재평가 여지. 증거 = `validation/NUNERZERO_TEST_2026-06-29.md`·`EXTERNAL_LLM_TEST_2026-06-23_*_NuNERZero.md`·`NER_BACKEND_COMPARISON_nunerzero.md`·`external_replay.py`. ① **어댑터**: `stage2/nunerzero_ner.py`(라벨 프롬프트 `사람`·`주소`·`조직` → PERSON/ADDRESS/ORGANIZATION 정규화)를 R18 추상화(`resolve_ner_backend`)에 추가, `PIIGUARD_NER_BACKEND=nunerzero`·`PIIGUARD_NUNERZERO_MODEL`로 노출, **기존 워커·타임아웃·degrade·proximity 후필터 경로 무변경 재사용**. ② **벤치**: 코퍼스 ground-truth + 외부 6리포트(claude·codex·gemini) **둘 다**에서 카테고리별 P/R/F1 측정, GLiNER·spaCy와 동일 하니스로 대조표 갱신(`validation/NER_BACKEND_COMPARISON.md`). ③ **채택 게이트**: (a) 어떤 카테고리도 GLiNER 대비 **recall 회귀 없음**, (b) **ORG 정밀도(GLiNER 0.774) 개선** 또는 종합 F1 우위, (c) 런타임 예산(메모리·콜드로드·p95) 충족 시에만 기본/옵션 승격. 불통과 시 비교 결과만 기록하고 GLiNER 기본 유지. | GLiNER 대안 조사(보고서 §2.3·외부 벤치) 결과 **동급 인코더 NER 중 한국어+상업 라이선스를 동시에 만족하는 후보는 NuNER Zero가 사실상 유일**. **토큰 분류** 구조라 긴/복합 엔티티(ADDRESS·ORG 경계)에 강점 → R20 임계값으로 안 풀리는 **ORG 정밀도 0.774**(§23.3)를 백엔드 교체로 개선할 가능성. DR-1(§23.4)이 명시한 "로컬 인코더 NER 모델 교체" 경로의 추가 실현. MIT라 현 Apache 정책과 무충돌. 상세 = `validation/NER_BACKEND_COMPARISON.md`(갱신 대상)·DESIGN ADR-11(확장). |
 
 ### 23.3 알려진 한계 (정직 선언 — P3 거짓 안심 금지)
 
@@ -658,7 +660,7 @@ acceptance_criteria:
 | ★ **BIZ_NO 하이픈 없는 10자리 미검출** | `1806341205`처럼 구분자 없는 사업자번호 미탐지(검증 recall 0.86). | **완화 = R17 양성 proximity**("사업자등록번호" 근접 시 맨 10자리 승격). |
 | ★ **코드/기술 텍스트 NER 과잉 마스킹** | 코드 리뷰·로그에서 식별자·일반명사(`주석`·`리턴값`·`LGTM`)를 인물/조직으로 NER 오분류(검증 정밀도 0.79, 진짜 오탐 36건). | **완화 = R17 음성 proximity / 콘텐츠 게이팅**(코드 구간 NER 억제, §6.3 부채 해소). |
 | **PERSON recall < 1.0** | spaCy lg 0.84 / GLiNER(Apache) 0.956. honorific 없는 맨이름 일부 누락. | 고심각 아님(이름=mask). ✅ R18 GLiNER 기본 채택으로 완화. 추가 = **R20 임계값↓(0.5→0.35 시 0.978)** / 파인튜닝. |
-| **ORGANIZATION 정밀도 < 1.0** | GLiNER(Apache) ORG 정밀도 0.774(FP 7, 조직 과추출·경계 오류). **임계값에 무반응** — 모델 특성. | 마스킹 방향이라 보안 영향 작음(과잉 마스킹). 완화 = **R20 GLiNER 파인튜닝**(hard-negative로 ORG 경계 교정, recall 유지·정밀도↑). |
+| **ORGANIZATION 정밀도 < 1.0** | GLiNER(Apache) ORG 정밀도 0.774(FP 7, 조직 과추출·경계 오류). **임계값에 무반응** — 모델 특성. | 마스킹 방향이라 보안 영향 작음(과잉 마스킹). 완화 = **R20 GLiNER 파인튜닝**(hard-negative로 ORG 경계 교정, recall 유지·정밀도↑) / **R21 NuNER Zero 백엔드 벤치 비교**(토큰 분류 구조의 ORG 경계 강점 검증·채택). |
 | **egress 락다운(티어2) 실검증 미수행** | pf(4)·root·실네트워크 필요한 통합테스트 12개가 CI에서 **항상 skip**. 실제 macOS pf 차단을 한 번도 실행 검증 안 함. | 티어2는 2차 범위. 배포 전 `sudo pytest -m integration` 실검증 필요. |
 | **hwp/hwpx·OCR 미구현** | 2차 범위. 현재 unscannable → fail-closed(block). | §11·§19대로 2차. |
 | **단일 프로세스 권한 모델** | 컨트롤/데이터 플레인 분리는 파일 권한·승인 게이트로 구현. 별도 UID·root 소유는 미적용(단일 사용자 가정). | root 권한 에이전트는 §2.3대로 범위 밖. |
@@ -669,7 +671,7 @@ acceptance_criteria:
 | :-- | :-- | :-- |
 | **외부 LLM(Claude/GPT API) 탐지** | ❌ **불가** | **P1 명시 위반**("탐지에 외부 LLM 금지") + **자기모순**(막으려는 PII를 탐지하려 외부 LLM에 전송) + P4 세 금고. |
 | **로컬 생성형 LLM(Ollama/llama.cpp) 탐지** | ⚠️ **비권장** | ① 메모리: 쓸만한 7B 양자화 ~4~5GB > 예산 1~1.5GB(M2 8GB 초과). ② 비결정성 → "거짓 안심"(P3) 위험. ③ 체크섬(주민번호·카드) 검증 불가. ④ 감사(Ledger) 재현성 약화. ⑤ **🔴 프롬프트 인젝션**: 위협모델 R13(탈취 가능 에이전트·비신뢰 콘텐츠)에서 *"이건 PII 아님"* 주입으로 **탐지기 자체가 무력화** — 공격면 확대. |
-| **규칙 + 로컬 인코더 NER 하이브리드(현행)** | ✅ **채택·유지** | 규칙=구조적·체크섬 PII에 **결정적·검증가능·인젝션 불가**(생성형보다 우월). 인코더 NER(spaCy↔**GLiNER** 선택, →KoELECTRA/KLUE 추가 교체 가능)=문맥 PII. 생성 안 하므로 **인젝션 불가**. §6.2 선택형 백엔드(R18)·추상화 슬롯에 모델 교체로 재현율 향상. |
+| **규칙 + 로컬 인코더 NER 하이브리드(현행)** | ✅ **채택·유지** | 규칙=구조적·체크섬 PII에 **결정적·검증가능·인젝션 불가**(생성형보다 우월). 인코더 NER(spaCy↔**GLiNER** 선택, →**NuNER Zero**(R21)·KoELECTRA/KLUE 추가 교체 가능)=문맥 PII. 생성 안 하므로 **인젝션 불가**. §6.2 선택형 백엔드(R18)·추상화 슬롯에 모델 교체로 재현율 향상. |
 
 > **결론**: 보안 탐지기에 생성형 LLM은 퇴보. "더 똑똑한 탐지"의 정답은 **로컬 인코더 NER 모델 교체**(이미 설계된 업그레이드 경로 — R18 선택형 백엔드로 1차 실현: GLiNER 기본 / spaCy 폴백)이며, 규칙은 고심각·체크섬 카테고리에서 계속 1급으로 유지한다.
 
